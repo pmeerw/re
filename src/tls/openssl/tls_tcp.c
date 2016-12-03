@@ -151,6 +151,11 @@ static int tls_connect(struct tls_conn *tc)
 	if (r <= 0) {
 		const int ssl_err = SSL_get_error(tc->ssl, r);
 
+		if (ssl_err == SSL_ERROR_SSL) {
+			DEBUG_WARNING("connect: SSL_ERROR_SSL\n");
+			ERR_print_errors_fp(stderr);
+		}
+
 		ERR_clear_error();
 
 		switch (ssl_err) {
@@ -179,6 +184,11 @@ static int tls_accept(struct tls_conn *tc)
 	r = SSL_accept(tc->ssl);
 	if (r <= 0) {
 		const int ssl_err = SSL_get_error(tc->ssl, r);
+
+		if (ssl_err != SSL_ERROR_WANT_READ) {
+			DEBUG_WARNING("accept: ERROR\n");
+			ERR_print_errors_fp(stderr);
+		}
 
 		ERR_clear_error();
 
@@ -269,6 +279,11 @@ static bool recv_handler(int *err, struct mbuf *mb, bool *estab, void *arg)
 		n = SSL_read(tc->ssl, mbuf_buf(mb), (int)mbuf_get_space(mb));
 		if (n <= 0) {
 			const int ssl_err = SSL_get_error(tc->ssl, n);
+
+			if (ssl_err != SSL_ERROR_WANT_READ) {
+				DEBUG_WARNING("SSL_read: ERROR\n");
+				ERR_print_errors_fp(stderr);
+			}
 
 			ERR_clear_error();
 

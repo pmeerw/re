@@ -11,7 +11,9 @@
 
 /** AES mode */
 enum aes_mode {
-	AES_MODE_CTR  /**< AES Counter mode (CTR) */
+	AES_MODE_CTR,         /**< AES Counter mode (CTR)                    */
+	AES_MODE_CBC_ENCRYPT, /**< AES Cipher Block Chaining (CBC) (encrypt) */
+	AES_MODE_CBC_DECRYPT, /**< AES Cipher Block Chaining (CBC) (decrypt) */
 };
 
 struct aes;

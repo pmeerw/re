@@ -366,12 +366,12 @@ static void conn_recv(struct tls_conn *tc, struct mbuf *mb)
 
 			tc->estabh(tc->arg);
 
-                        nrefs = mem_nrefs(tc);
-                        mem_deref(tc);
+			nrefs = mem_nrefs(tc);
+			mem_deref(tc);
 
-                        /* check if connection was deref'd from handler */
-                        if (nrefs == 1)
-                                return;
+			/* check if connection was deref'd from handler */
+			if (nrefs == 1)
+				return;
 		}
 	}
 
@@ -425,6 +425,23 @@ static void conn_recv(struct tls_conn *tc, struct mbuf *mb)
 
 	return;
 }
+
+
+#if 0
+static void msg_cb(int write_p, int version, int content_type, const void *buf,
+		   size_t len, SSL *ssl, void *arg)
+{
+	const char *str_write_p = write_p ? "send >>>" : "recv <<<";
+
+	re_fprintf(stderr,
+		  "\x1b[36m"
+		  "server: %s version=%04x type=%d len=%zu"
+		  "\x1b[;m"
+		  "\n"
+		   ,
+		   str_write_p, version, content_type, len);
+}
+#endif
 
 
 static int conn_alloc(struct tls_conn **ptc, struct tls *tls,
@@ -486,6 +503,18 @@ static int conn_alloc(struct tls_conn **ptc, struct tls *tls,
 	SSL_set_bio(tc->ssl, tc->sbio_in, tc->sbio_out);
 
 	SSL_set_read_ahead(tc->ssl, 1);
+
+#if 1
+	SSL_set_options(tc->ssl, SSL_OP_NO_QUERY_MTU);
+	if (!DTLS_set_link_mtu(tc->ssl, 1480)) {
+		DEBUG_WARNING("DTLS_set_link_mtu error\n");
+	}
+#endif
+
+#if 0
+	SSL_set_debug(tc->ssl, 1);
+	SSL_set_msg_callback(tc->ssl, msg_cb);
+#endif
 
  out:
 	if (err)
@@ -706,7 +735,7 @@ static struct tls_conn *conn_lookup(struct dtls_sock *sock,
 				    const struct sa *peer)
 {
 	return list_ledata(hash_lookup(sock->ht, sa_hash(peer, SA_ALL),
-                                       cmp_handler, (void *)peer));
+				       cmp_handler, (void *)peer));
 }
 
 
@@ -715,6 +744,9 @@ static bool recv_handler(struct sa *src, struct mbuf *mb, void *arg)
 	struct dtls_sock *sock = arg;
 	struct tls_conn *tc;
 	uint8_t b;
+
+	DEBUG_INFO("recv %zu bytes from %J\n",
+		   mbuf_get_left(mb), src);
 
 	if (mbuf_get_left(mb) < 1)
 		return false;

@@ -37,3 +37,7 @@ void     mem_threshold_set(ssize_t n);
 struct re_printf;
 int      mem_status(struct re_printf *pf, void *unused);
 int      mem_get_stat(struct memstat *mstat);
+
+
+bool     mem_is_valid(const void *data);
+void     mem_print(const void *data);

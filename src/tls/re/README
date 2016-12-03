@@ -1,0 +1,240 @@
+TLS Protocol stack
+------------------
+
+
+
+
+  .---------.  .--------.  .-------.  .-----------.
+  |         |  | Change |  |       |  |Application|
+  |Handshake|  | Cipher |  | Alert |  |   Data    |
+  |         |  | Spec   |  |       |  |           |
+  '---------'  '--------'  '-------'  '-----------'
+       |            |          |           |
+       |            |          |           |
+  .-----------------------------------------------.  * Transaction-layer
+  |                                               |  * Payload integrity
+  |               TLS Record layer                |  * Cryptographic securty
+  |                                               |  * Compression
+  '-----------------------------------------------'  
+                          |
+                          |
+                    .-----------.
+                    |  UDP/TCP  |
+                    '-----------'
+
+
+  RECORD LAYER OVERVIEW:
+
+
+            Write                         Read
+  .----------------------------------------------------.
+  |           |                            /|\         |
+  |          \|/                            |          |
+  |   .---------------.             .---------------.  |
+  |   | Fragmentation |             |  Reassemble   |  |
+  |   '---------------'             '---------------'  |
+  |           |                            /|\         |
+  |          \|/                            |          |
+  |   .---------------.             .---------------.  |
+  |   |  Compression  |             |  Decompress   |  |
+  |   '---------------'             '---------------'  |
+  |           |                            /|\         |
+  |          \|/                            |          |
+  |   .---------------.             .---------------.  |
+  |   |   Apply MAC   |             |  Verify MAC   |  |
+  |   '---------------'             '---------------'  |
+  |           |                            /|\         |
+  |          \|/                            |          |
+  |   .---------------.             .---------------.  |
+  |   |    Encrypt    |             |    Decrypt    |  |
+  |   '---------------'             '---------------'  |
+  |           |                            /|\         |
+  |          \|/                            |          |
+  '----------------------------------------------------'
+         transmit                        receive
+
+
+
+
+
+
+Functional overview:
+-------------------
+
+TLS Version 1.0 (RFC 2246) ....... NO
+TLS Version 1.1 (RFC 4346) ....... NO
+TLS Version 1.2 (RFC 5246) ....... YES
+DTLS Version 1.0 (RFC 4347) ...... NO
+DTLS Version 1.2 (RFC 6347) ...... YES
+
+Endpoints:
+Client ........................... YES
+Server ........................... YES
+
+Key Exchange:
+RSA .............................. YES
+RSA_PSK .......................... NO
+DHE_RSA .......................... NO
+ECDHE_RSA ........................ NO
+DHE_DSS .......................... NO
+DH_DSS ........................... NO
+DH_RSA ........................... NO
+ECDH_ECDSA ....................... NO
+ECDH_RSA ......................... NO
+ECDHE_ECDSA ...................... NO
+
+Cipher:
+NULL ............................. YES
+RC4_128 .......................... NO
+3DES_EDE_CBC ..................... NO
+AES_128_CBC ...................... YES
+AES_256_CBC ...................... NO
+
+MAC:
+NULL ............................. YES
+MD5 .............................. NO
+SHA .............................. YES
+SHA256 ........................... YES
+
+Compression:
+Null ............................. YES
+Deflate .......................... NO    (not planned)
+
+Record types:
+ChangeCipherSpec ................. YES
+Alert ............................ YES
+Handshake ........................ YES
+ApplicationData .................. YES
+
+Transport:
+UDP retransmit and queueing (tx).. NO (todo)
+UDP sending fragmentation ........ NO (todo)
+UDP receiving reassembly ......... NO (todo)
+TCP transport .................... YES
+Multiple handshakes per record ... YES
+Multiple records per handshake ... YES
+
+Extensions: ...................... None
+PRF P_SHA256 ......................YES
+
+Debug tracing .....................YES
+
+
+verify integrity of certificates... NO (todo)
+support certificate revocation .... NO
+secure storage of keys ............ NO (todo)
+
+RFC 5264 D.4 Implementation Pitfalls ..... NO (todo)
+
+DTLS 4.1.2.6.  Anti-Replay ............... NO
+
+
+
+
+--> Testing vulnerabilities
+
+ Heartbleed (CVE-2014-0160)                not vulnerable (OK)
+ CCS (CVE-2014-0224)                       not vulnerable (OK)
+ Secure Renegotiation (CVE-2009-3555)      VULNERABLE (NOT ok)
+ Secure Client-Initiated Renegotiation     not vulnerable (OK)
+ CRIME, TLS (CVE-2012-4929)                not vulnerable (OK) (not using HTTP anyway)
+ POODLE, SSL (CVE-2014-3566)               not vulnerable (OK)
+ TLS_FALLBACK_SCSV (RFC 7507), experim.    Check failed: seems like TLS 1.2 is the only protocol 
+ FREAK (CVE-2015-0204)                     not vulnerable (OK) (tested with 4/9 ciphers)
+ LOGJAM (CVE-2015-4000), experimental      not vulnerable (OK) (tested w/ 2/4 ciphers only!), common primes not checked. See below for any DH ciphers + bit size
+ BEAST (CVE-2011-3389)                     no SSL3 or TLS1
+ RC4 (CVE-2013-2566, CVE-2015-2808)        no RC4 ciphers detected (OK)
+
+
+
+
+
+TODO:
+----
+
+[DONE] Goal 1: simple DTLS client connecting to OpenSSL DTLS server
+               - RSA Certificate only (no DH)
+               - NULL cipher
+               - simple MAC (such as MD5,SHA1)
+               - check that master_secret is same
+
+[DONE] Goal 2: simple TLS client
+
+[DONE] Goal 3: add support for AES encryption/decryption
+
+[DONE] Goal 4: send/recv application data
+
+[DONE] Goal 5: simple TLS server
+
+       Goal 6: simple DTLS server
+
+       Goal 7: test various TLS tools against TLS server
+
+       compile with LibreSSL on OpenBSD
+
+       todo: add a failing testcase
+
+
+
+[Client]                       [Server]
+
+54    -------- ClientHello ------->
+
+82    <------- ServerHello -------
+434   <------- Certificate -------
+12    <----- ServerHelloDone -----
+
+142   ----- ClientKeyExchange ---->
+
+      ===== ChangeCipherSpec =====>    COMMIT
+      -------- Finished (*) ------>
+
+COMMIT<===== ChangeCipherSpec =====
+      <--------- Finished (*) -----
+
+
+(*) Encrypted
+
+
+
+
+Software architecture:
+
+                .-------------.
+                | Application |
+                '-------------'
+                       |
+                       |
+                      \|/
+  .----------------------------------------.
+  |                                        |
+  |                TLS/DTLS                |
+  |                                        |
+  '----------------------------------------'
+      |          |           |          |
+      |          |           |          |
+     \|/        \|/         \|/        \|/
+  .------.    .-----.    .------.    .-----.
+  | Cert |    | AES |    | HMAC |    | SHA | 
+  '------'    '-----'    '------'    '-----'
+
+ Certificate   AES-CBC   HMAC-SHA1    SHA256
+ Handling      128/256   HMAC-SHA256
+ + RSA
+
+
+
+
+Reference:
+---------
+
+RFC 7748  Elliptic Curves for Security
+http://tools.ietf.org/html/rfc5746
+
+
+Bugs:
+----
+
+$ openssl s_server -cert /etc/restund/creytiv.pem -accept 4433 -state -dtls1_2
+cert: unable to parse certificate 950 bytes in memory at offset 0
+

@@ -60,6 +60,8 @@ extern "C" {
 #include "re_udp.h"
 #include "re_websock.h"
 
+#include "re_cert.h"
+
 #ifdef __cplusplus
 }
 #endif

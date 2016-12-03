@@ -5,6 +5,7 @@
  */
 #include <string.h>
 #include <re_types.h>
+#include <re_mem.h>
 #ifdef USE_OPENSSL
 #include <openssl/sha.h>
 #include <openssl/hmac.h>

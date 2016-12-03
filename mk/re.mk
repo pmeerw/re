@@ -443,7 +443,19 @@ USE_OPENSSL := $(shell [ -f $(SYSROOT)/include/openssl/ssl.h ] || \
 	[ -f $(SYSROOT)/local/include/openssl/ssl.h ] || \
 	[ -f $(SYSROOT_ALT)/include/openssl/ssl.h ] && echo "yes")
 
+# todo: configurable
+USE_OPENSSL_TLS  :=
+USE_OPENSSL_DTLS :=
+USE_OPENSSL_SRTP :=
+
 ifneq ($(USE_OPENSSL),)
+
+ifneq ($(USE_OPENSSL_TLS),)
+CFLAGS  += -DUSE_OPENSSL_TLS
+#LIBS    += -lssl
+endif
+
+# TODO: do we need to link to -lssl ?
 CFLAGS  += -DUSE_OPENSSL -DUSE_TLS
 LIBS    += -lssl -lcrypto
 USE_TLS := yes
@@ -455,6 +467,7 @@ USE_OPENSSL_DTLS := $(shell [ -f $(SYSROOT)/include/openssl/dtls1.h ] || \
 USE_OPENSSL_SRTP := $(shell [ -f $(SYSROOT)/include/openssl/srtp.h ] || \
 	[ -f $(SYSROOT)/local/include/openssl/srtp.h ] || \
 	[ -f $(SYSROOT_ALT)/include/openssl/srtp.h ] && echo "yes")
+
 
 ifneq ($(USE_OPENSSL_DTLS),)
 CFLAGS  += -DUSE_OPENSSL_DTLS -DUSE_DTLS

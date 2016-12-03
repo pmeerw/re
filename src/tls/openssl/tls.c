@@ -41,6 +41,46 @@ struct tls_conn {
 };
 
 
+static BIO *bio_err;
+
+
+static void apps_ssl_info_callback(const SSL *s, int where, int ret)
+{
+	const char *str;
+	int w;
+
+	if (!bio_err)
+		bio_err = BIO_new_fp(stderr, 0);
+
+	w=where& ~SSL_ST_MASK;
+
+	if (w & SSL_ST_CONNECT) str="SSL_connect";
+	else if (w & SSL_ST_ACCEPT) str="SSL_accept";
+	else str="undefined";
+
+	if (where & SSL_CB_LOOP) {
+		BIO_printf(bio_err,"%s:%s\n",str,SSL_state_string_long(s));
+	}
+	else if (where & SSL_CB_ALERT) {
+		str=(where & SSL_CB_READ)?"read":"write";
+		BIO_printf(bio_err,"SSL3 alert %s:%s:%s\n",
+			str,
+			SSL_alert_type_string_long(ret),
+			SSL_alert_desc_string_long(ret));
+	}
+	else if (where & SSL_CB_EXIT) {
+		if (ret == 0) {
+			BIO_printf(bio_err,"SSL_CB_EXIT %s:failed in %s\n",
+				str,SSL_state_string_long(s));
+		}
+		else if (ret < 0) {
+			BIO_printf(bio_err,"SSL_CB_EXIT %s:error in %s\n",
+				   str,SSL_state_string_long(s));
+		}
+	}
+}
+
+
 static void destructor(void *data)
 {
 	struct tls *tls = data;
@@ -122,6 +162,10 @@ int tls_alloc(struct tls **tlsp, enum tls_method method, const char *keyfile,
 		tls->ctx = SSL_CTX_new(SSLv23_method());
 		break;
 
+	case TLS_METHOD_TLSV1_2:
+		tls->ctx = SSL_CTX_new(TLSv1_2_method());
+		break;
+
 #ifdef USE_OPENSSL_DTLS
 	case TLS_METHOD_DTLSV1:
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L && \
@@ -169,6 +213,15 @@ int tls_alloc(struct tls **tlsp, enum tls_method method, const char *keyfile,
 	SSL_CTX_set_verify_depth(tls->ctx, 1);
 #endif
 
+#if 1
+	r = SSL_CTX_set_cipher_list(tls->ctx, "NULL:AES");
+	if (r <= 0) {
+		DEBUG_WARNING("set_cipher_list failed\n");
+		err = EPROTO;
+		goto out;
+	}
+#endif
+
 	/* Load our keys and certificates */
 	if (keyfile) {
 		if (pwd) {
@@ -208,6 +261,13 @@ int tls_alloc(struct tls **tlsp, enum tls_method method, const char *keyfile,
 		goto out;
 	}
 #endif
+
+	if (0) {
+		SSL_CTX_set_info_callback(tls->ctx, apps_ssl_info_callback);
+	}
+
+	/* for testing Handshake reasm code */
+	SSL_CTX_set_max_send_fragment(tls->ctx, 512);
 
 	err = 0;
  out:

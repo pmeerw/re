@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2010 Creytiv.com
  */
+#include <assert.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,6 +37,13 @@ struct mem {
 	size_t size;        /**< Size of memory object */
 #endif
 };
+
+
+#define TRAILER_MAGIC 0xc001d00d
+struct trailer {
+	uint32_t magic;
+};
+
 
 #if MEM_DEBUG
 /* Memory debugging */
@@ -126,6 +134,9 @@ static inline void mem_unlock(void)
 void *mem_alloc(size_t size, mem_destroy_h *dh)
 {
 	struct mem *m;
+	struct trailer *tr;
+	size_t rl_size;
+	void *ptr;
 
 #if MEM_DEBUG
 	mem_lock();
@@ -136,7 +147,8 @@ void *mem_alloc(size_t size, mem_destroy_h *dh)
 	mem_unlock();
 #endif
 
-	m = malloc(sizeof(*m) + size);
+	rl_size = sizeof(*m) + size + sizeof(*tr);
+	m = malloc(rl_size);
 	if (!m)
 		return NULL;
 
@@ -152,7 +164,12 @@ void *mem_alloc(size_t size, mem_destroy_h *dh)
 
 	STAT_ALLOC(m, size);
 
-	return (void *)(m + 1);
+	ptr = (void *)(m + 1);
+
+	tr = (void *)( (char *)ptr + size);
+	tr->magic = TRAILER_MAGIC;
+
+	return ptr;
 }
 
 
@@ -191,9 +208,13 @@ void *mem_zalloc(size_t size, mem_destroy_h *dh)
 void *mem_realloc(void *data, size_t size)
 {
 	struct mem *m, *m2;
+	struct trailer *tr;
+	void *ptr;
 
 	if (!data)
 		return NULL;
+
+	assert(mem_is_valid(data));
 
 	m = ((struct mem *)data) - 1;
 
@@ -214,7 +235,7 @@ void *mem_realloc(void *data, size_t size)
 	mem_unlock();
 #endif
 
-	m2 = realloc(m, sizeof(*m2) + size);
+	m2 = realloc(m, sizeof(*m2) + size + sizeof(*tr));
 
 #if MEM_DEBUG
 	mem_lock();
@@ -227,6 +248,12 @@ void *mem_realloc(void *data, size_t size)
 	}
 
 	STAT_REALLOC(m2, size);
+
+	ptr = (void *)(m2 + 1);
+
+	tr = (void *)( (char *)ptr + size);
+	tr->magic = TRAILER_MAGIC;
+
 
 	return (void *)(m2 + 1);
 }
@@ -278,6 +305,8 @@ void *mem_ref(void *data)
 {
 	struct mem *m;
 
+	assert(mem_is_valid(data));
+
 	if (!data)
 		return NULL;
 
@@ -306,6 +335,8 @@ void *mem_deref(void *data)
 
 	if (!data)
 		return NULL;
+
+	assert(mem_is_valid(data));
 
 	m = ((struct mem *)data) - 1;
 
@@ -348,6 +379,8 @@ uint32_t mem_nrefs(const void *data)
 
 	if (!data)
 		return 0;
+
+	assert(mem_is_valid(data));
 
 	m = ((struct mem *)data) - 1;
 
@@ -506,4 +539,52 @@ int mem_get_stat(struct memstat *mstat)
 #else
 	return ENOSYS;
 #endif
+}
+
+
+bool mem_is_valid(const void *data)
+{
+	struct mem *m;
+	struct trailer *tr;
+
+	if (!data)
+		return true;
+
+	m = ((struct mem *)data) - 1;
+
+	tr = (void *)((uint8_t *)data + m->size);
+
+	if (m->magic != mem_magic) {
+		DEBUG_WARNING("invalid header magic\n");
+		return false;
+	}
+	if (tr->magic != TRAILER_MAGIC) {
+		DEBUG_WARNING("invalid trailer magic (nrefs=%u, size=%zu)\n",
+			      m->nrefs, m->size);
+		return false;
+	}
+
+	return true;
+}
+
+
+void mem_print(const void *data)
+{
+	struct mem *m;
+	struct trailer *tr;
+
+	if (!data)
+		return;
+
+	m = ((struct mem *)data) - 1;
+
+	tr = (void *)((uint8_t *)data + m->size);
+
+	re_printf("memory object at %p:\n", data);
+	re_printf("nrefs=%u, dh=%p, size=%zu\n",
+		  m->nrefs, m->dh, m->size);
+
+	hexdump(stdout, data, m->size);
+
+	re_printf("trailer: 0x%08x\n", tr->magic);
 }

@@ -43,12 +43,10 @@ int aes_alloc(struct aes **aesp, enum aes_mode mode,
 	const EVP_CIPHER *cipher;
 	struct aes *st;
 	int err = 0, r;
+	bool decrypt = mode == AES_MODE_CBC_DECRYPT;
 
 	if (!aesp || !key)
 		return EINVAL;
-
-	if (mode != AES_MODE_CTR)
-		return ENOTSUP;
 
 	st = mem_zalloc(sizeof(*st), destructor);
 	if (!st)
@@ -72,22 +70,60 @@ int aes_alloc(struct aes **aesp, enum aes_mode mode,
 	EVP_CIPHER_CTX_init(st->ctx);
 #endif
 
-	switch (key_bits) {
+	switch (mode) {
 
-	case 128: cipher = EVP_aes_128_ctr(); break;
-	case 192: cipher = EVP_aes_192_ctr(); break;
-	case 256: cipher = EVP_aes_256_ctr(); break;
+	case AES_MODE_CTR:
+		switch (key_bits) {
+
+		case 128: cipher = EVP_aes_128_ctr(); break;
+		case 192: cipher = EVP_aes_192_ctr(); break;
+		case 256: cipher = EVP_aes_256_ctr(); break;
+		default:
+			re_fprintf(stderr, "aes: unknown key: %zu bits\n",
+				   key_bits);
+			err = EINVAL;
+			goto out;
+		}
+		break;
+
+	case AES_MODE_CBC_ENCRYPT:
+	case AES_MODE_CBC_DECRYPT:
+		switch (key_bits) {
+
+		case 128: cipher = EVP_aes_128_cbc(); break;
+		case 192: cipher = EVP_aes_192_cbc(); break;
+		case 256: cipher = EVP_aes_256_cbc(); break;
+		default:
+			re_fprintf(stderr, "aes: unknown key: %zu bits\n",
+				   key_bits);
+			err = EINVAL;
+			goto out;
+		}
+		break;
+
 	default:
-		re_fprintf(stderr, "aes: unknown key: %zu bits\n", key_bits);
-		err = EINVAL;
+		err = ENOTSUP;
 		goto out;
 	}
 
-	r = EVP_EncryptInit_ex(st->ctx, cipher, NULL, key, iv);
-	if (!r) {
-		ERR_clear_error();
-		err = EPROTO;
+	/* NOTE: for CBC-mode, Encrypt and Decrypt is different */
+	if (decrypt) {
+		r = EVP_DecryptInit_ex(st->ctx, cipher, NULL, key, iv);
+		if (!r) {
+			ERR_clear_error();
+			err = EPROTO;
+		}
 	}
+	else {
+		r = EVP_EncryptInit_ex(st->ctx, cipher, NULL, key, iv);
+		if (!r) {
+			ERR_clear_error();
+			err = EPROTO;
+		}
+	}
+
+	/* disable padding, this is needed for CBC-mode */
+	EVP_CIPHER_CTX_set_padding(st->ctx, 0);
 
  out:
 	if (err)
@@ -114,12 +150,28 @@ void aes_set_iv(struct aes *aes, const uint8_t iv[AES_BLOCK_SIZE])
 
 int aes_encr(struct aes *aes, uint8_t *out, const uint8_t *in, size_t len)
 {
-	int c_len = (int)len;
+	int c_len;
 
 	if (!aes || !out || !in)
 		return EINVAL;
 
 	if (!EVP_EncryptUpdate(aes->ctx, out, &c_len, in, (int)len)) {
+		ERR_clear_error();
+		return EPROTO;
+	}
+
+	return 0;
+}
+
+
+int aes_decr(struct aes *aes, uint8_t *out, const uint8_t *in, size_t len)
+{
+	int len_upd;
+
+	if (!aes || !out || !in)
+		return EINVAL;
+
+	if (!EVP_DecryptUpdate(aes->ctx, out, &len_upd, in, (int)len)) {
 		ERR_clear_error();
 		return EPROTO;
 	}
@@ -205,14 +257,3 @@ int aes_encr(struct aes *aes, uint8_t *out, const uint8_t *in, size_t len)
 
 
 #endif /* EVP_CIPH_CTR_MODE */
-
-
-/*
- * Common code:
- */
-
-
-int aes_decr(struct aes *aes, uint8_t *out, const uint8_t *in, size_t len)
-{
-	return aes_encr(aes, out, in, len);
-}

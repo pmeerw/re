@@ -1,3 +1,8 @@
+/**
+ * @file mac.c TLS MAC routines
+ *
+ * Copyright (C) 2010 - 2016 Creytiv.com
+ */
 
 #include <string.h>
 #include <assert.h>

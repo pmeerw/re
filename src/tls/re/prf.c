@@ -1,3 +1,8 @@
+/**
+ * @file prf.c TLS Pseudorandom Function (PRF)
+ *
+ * Copyright (C) 2010 - 2016 Creytiv.com
+ */
 
 #include <string.h>
 #include <re_types.h>

@@ -1,3 +1,9 @@
+/**
+ * @file record.c TLS records
+ *
+ * Copyright (C) 2010 - 2016 Creytiv.com
+ */
+
 #include <re_types.h>
 #include <re_fmt.h>
 #include <re_mem.h>

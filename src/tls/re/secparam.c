@@ -1,3 +1,8 @@
+/**
+ * @file secparam.c TLS Security Parameters
+ *
+ * Copyright (C) 2010 - 2016 Creytiv.com
+ */
 
 #include <string.h>
 #include <time.h>

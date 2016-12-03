@@ -1,3 +1,8 @@
+/**
+ * @file tls_tcp.c TLS with TCP-transport
+ *
+ * Copyright (C) 2010 - 2016 Creytiv.com
+ */
 
 #include <re_types.h>
 #include <re_fmt.h>

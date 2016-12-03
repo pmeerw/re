@@ -1,3 +1,8 @@
+/**
+ * @file cert.c Certificate handling
+ *
+ * Copyright (C) 2010 - 2016 Creytiv.com
+ */
 
 /* for certificate parsing */
 #include <openssl/x509.h>

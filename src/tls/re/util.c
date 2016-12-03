@@ -1,3 +1,8 @@
+/**
+ * @file util.c TLS utilities
+ *
+ * Copyright (C) 2010 - 2016 Creytiv.com
+ */
 
 #include <string.h>
 #include <assert.h>  /* XXX: temporary during development */

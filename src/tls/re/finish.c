@@ -1,3 +1,8 @@
+/**
+ * @file finish.c TLS finished routines
+ *
+ * Copyright (C) 2010 - 2016 Creytiv.com
+ */
 
 #include <string.h>
 #include <re_types.h>

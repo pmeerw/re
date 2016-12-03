@@ -1,3 +1,9 @@
+/**
+ * @file handshake.c TLS handshake
+ *
+ * Copyright (C) 2010 - 2016 Creytiv.com
+ */
+
 #include <string.h>
 #include <re_types.h>
 #include <re_fmt.h>

@@ -1,3 +1,8 @@
+/**
+ * @file re_cert.h Interface to Certificate handling
+ *
+ * Copyright (C) 2010 - 2016 Creytiv.com
+ */
 
 
 struct cert;

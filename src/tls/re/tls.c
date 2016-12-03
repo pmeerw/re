@@ -128,6 +128,9 @@ int tls_alloc(struct tls **tlsp, enum tls_method method, const char *keyfile,
 
 int tls_add_ca(struct tls *tls, const char *capath)
 {
+	(void)tls;
+	(void)capath;
+	DEBUG_WARNING("add_ca: not implemented\n");
 	return ENOSYS;
 }
 
@@ -273,6 +276,8 @@ int tls_peer_common_name(const struct tls_conn *tc, char *cn, size_t size)
 
 int tls_peer_verify(const struct tls_conn *tc)
 {
+	(void)tc;
+	DEBUG_WARNING("peer_verify: not implemented\n");
 	return ENOSYS;
 }
 

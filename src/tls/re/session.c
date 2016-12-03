@@ -598,7 +598,7 @@ int  tls_session_alloc(struct tls_session **sessp,
 			tls_sess_close_h *closeh, void *arg)
 {
 	struct tls_session *sess;
-	uint8_t random[32];
+	uint8_t sp_random[32];
 	size_t i;
 	int err = 0;
 
@@ -632,11 +632,11 @@ int  tls_session_alloc(struct tls_session **sessp,
 	memcpy(sess->cipherv, cipherv, cipherc * sizeof(*cipherv));
 	sess->cipherc = cipherc;
 
-	rand_bytes(random, sizeof(random));
+	rand_bytes(sp_random, sizeof(sp_random));
 
-	err |= tls_secparam_init(&sess->sp_write, random,
+	err |= tls_secparam_init(&sess->sp_write, sp_random,
 				  1, conn_end == TLS_CLIENT);
-	err |= tls_secparam_init(&sess->sp_read, random,
+	err |= tls_secparam_init(&sess->sp_read, sp_random,
 				  0, conn_end == TLS_CLIENT);
 	if (err)
 		goto out;

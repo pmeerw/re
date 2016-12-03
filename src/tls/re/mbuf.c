@@ -41,7 +41,7 @@ int mbuf_write_u48_hton(struct mbuf *mb, uint48_t u)
 	int err = 0;
 
 	err |= mbuf_write_u16(mb, htons(u >> 32));
-	err |= mbuf_write_u32(mb, htonl(u & 0xffffffff));
+	err |= mbuf_write_u32(mb, htonl((uint32_t)u & 0xffffffff));
 
 	return err;
 }

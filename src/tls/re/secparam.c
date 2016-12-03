@@ -24,10 +24,10 @@
 
 
 int tls_secparam_init(struct tls_secparam *sp,
-		       const uint8_t random[32],
+		       const uint8_t randomb[32],
 		       bool is_write, bool client)
 {
-	if (!sp)
+	if (!sp || !randomb)
 		return EINVAL;
 
 	memset(sp, 0, sizeof(*sp));
@@ -37,11 +37,11 @@ int tls_secparam_init(struct tls_secparam *sp,
 
 	if (client) {
 		mem_cpy(sp->client_random, sizeof(sp->client_random),
-			random, 32);
+			randomb, 32);
 	}
 	else {
 		mem_cpy(sp->server_random, sizeof(sp->server_random),
-			random, 32);
+			randomb, 32);
 	}
 
 	sp->is_write = is_write;

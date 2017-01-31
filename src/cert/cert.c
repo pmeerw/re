@@ -366,7 +366,7 @@ int cert_public_encrypt(struct cert *cert,
 			const uint8_t *in, size_t in_len)
 {
 	EVP_PKEY *pubkey = NULL;
-	RSA *rsa_key;
+	RSA *rsa_key = NULL;
 	int key_length;
 	int algonid, r;
 	int err = 0;
@@ -438,6 +438,8 @@ int cert_public_encrypt(struct cert *cert,
 	}
 
  out:
+	if (rsa_key)
+		RSA_free(rsa_key);
 	if (pubkey)
 		EVP_PKEY_free(pubkey);
 

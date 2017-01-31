@@ -381,15 +381,23 @@ int cert_public_encrypt(struct cert *cert,
 		goto out;
 	}
 
+	algonid = EVP_PKEY_id(pubkey);
+#if 0
 	algonid = OBJ_obj2nid(cert->x509->cert_info->key->algor->algorithm);
+#endif
 
 	DEBUG_INFO("cert: public key has algorithm '%s'\n",
 		   OBJ_nid2ln(algonid));
 
 	switch (algonid) {
 
-	case NID_rsaEncryption:
-		rsa_key = pubkey->pkey.rsa;
+	case EVP_PKEY_RSA:
+		rsa_key = EVP_PKEY_get1_RSA(pubkey);
+		if (!rsa_key) {
+			DEBUG_WARNING("no rsa_key\n");
+			err = ENOENT;
+			goto out;
+		}
 
 #if 0
 		re_fprintf(stderr, "RSA public key:\n");

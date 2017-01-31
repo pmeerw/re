@@ -32,8 +32,7 @@ int tls_secparam_init(struct tls_secparam *sp,
 
 	memset(sp, 0, sizeof(*sp));
 
-	sp->entity                = client ? TLS_CLIENT : TLS_SERVER;
-	sp->prf_algorithm         = TLS_PRF_TLS_PRF_SHA256; /* fixed */
+	sp->entity = client ? TLS_CLIENT : TLS_SERVER;
 
 	if (client) {
 		mem_cpy(sp->client_random, sizeof(sp->client_random),
@@ -114,8 +113,6 @@ void tls_secparam_dump(const struct tls_secparam *sp)
 
 	re_printf("SecurityParameters (%s):\n",
 		  sp->entity == TLS_CLIENT ? "Client" : "Server");
-	re_printf("PRF:               %s\n",
-	  sp->prf_algorithm==TLS_PRF_TLS_PRF_SHA256 ? "SHA256" : "?");
 	re_printf("bulk_cipher:       %s\n",
 		  tls_bulkcipher_name(sp->bulk_cipher_algorithm));
 	re_printf("cipher_type:       %s\n",

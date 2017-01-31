@@ -145,11 +145,6 @@ enum tls_connection_end {
 	TLS_SERVER = 1
 };
 
-/* PRF (Pseudo-Random Function) */
-enum tls_prf_algorithm {
-	TLS_PRF_TLS_PRF_SHA256
-};
-
 enum tls_bulkcipher_algorithm {
 	TLS_BULKCIPHER_NULL = 0,
 	TLS_BULKCIPHER_AES
@@ -177,7 +172,6 @@ enum tls_mac_algorithm {
 
 enum tls_compression_method {
 	TLS_COMPRESSION_NULL    = 0,
-	/*TLS_COMPRESSION_DEFLATE = 1,*/
 };
 
 
@@ -420,7 +414,6 @@ int tls_prf_sha256(uint8_t *output, size_t output_len,
 
 struct tls_secparam {
 	enum tls_connection_end        entity;
-	enum tls_prf_algorithm         prf_algorithm;
 	enum tls_bulkcipher_algorithm  bulk_cipher_algorithm;
 	enum tls_ciphertype            cipher_type;
 	unsigned                       enc_key_length;         /* bytes */

@@ -640,8 +640,8 @@ CCACHE :=
 endif
 
 CC	:= $(CCACHE) $(CC)
-CFLAGS	+= $(EXTRA_CFLAGS)
-LFLAGS	+= $(EXTRA_LFLAGS)
+CFLAGS	+= $(EXTRA_CFLAGS) -fsanitize=address
+LFLAGS	+= $(EXTRA_LFLAGS) -fsanitize=address
 
 BUILD   := build-$(ARCH)
 

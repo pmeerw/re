@@ -2068,7 +2068,7 @@ void tls_set_trace(struct tls_session *sess, enum tls_trace_flags flags,
 enum tls_cipher_suite tls_session_cipher(struct tls_session *sess)
 {
 	if (!sess)
-		return TLS_NULL_WITH_NULL_NULL;
+		return TLS_CIPHER_NULL_WITH_NULL_NULL;
 
 	return sess->selected_cipher_suite;
 }

@@ -242,15 +242,15 @@ enum tls_alertdescr {
 #define CIPHER(a,b)  (a)<<8 | (b)
 enum tls_cipher_suite {
 
-	TLS_NULL_WITH_NULL_NULL               = CIPHER(0x00,0x00),
+	TLS_CIPHER_NULL_WITH_NULL_NULL            = CIPHER(0x00,0x00),
 
 	/* RSA cipher-suites */
-	TLS_RSA_WITH_NULL_SHA                 = CIPHER(0x00,0x02),
-	TLS_RSA_WITH_NULL_SHA256              = CIPHER(0x00,0x3B),
-	TLS_RSA_WITH_AES_128_CBC_SHA          = CIPHER(0x00,0x2F), /*mand*/
-	TLS_RSA_WITH_AES_256_CBC_SHA          = CIPHER(0x00,0x35),
-	TLS_RSA_WITH_AES_128_CBC_SHA256       = CIPHER(0x00,0x3C),
-	TLS_RSA_WITH_AES_256_CBC_SHA256       = CIPHER(0x00,0x3D),
+	TLS_CIPHER_RSA_WITH_NULL_SHA              = CIPHER(0x00,0x02),
+	TLS_CIPHER_RSA_WITH_NULL_SHA256           = CIPHER(0x00,0x3B),
+	TLS_CIPHER_RSA_WITH_AES_128_CBC_SHA       = CIPHER(0x00,0x2F), /*mand*/
+	TLS_CIPHER_RSA_WITH_AES_256_CBC_SHA       = CIPHER(0x00,0x35),
+	TLS_CIPHER_RSA_WITH_AES_128_CBC_SHA256    = CIPHER(0x00,0x3C),
+	TLS_CIPHER_RSA_WITH_AES_256_CBC_SHA256    = CIPHER(0x00,0x3D),
 };
 
 struct tls_change_cipher_spec {

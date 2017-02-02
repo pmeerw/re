@@ -41,10 +41,10 @@ struct tls_conn {
  */
 static const enum tls_cipher_suite default_suitev[] = {
 
-	TLS_RSA_WITH_AES_256_CBC_SHA256,
-	TLS_RSA_WITH_AES_128_CBC_SHA256,
-	TLS_RSA_WITH_AES_256_CBC_SHA,
-	TLS_RSA_WITH_AES_128_CBC_SHA,
+	TLS_CIPHER_RSA_WITH_AES_256_CBC_SHA256,
+	TLS_CIPHER_RSA_WITH_AES_128_CBC_SHA256,
+	TLS_CIPHER_RSA_WITH_AES_256_CBC_SHA,
+	TLS_CIPHER_RSA_WITH_AES_128_CBC_SHA,
 };
 
 
@@ -273,7 +273,7 @@ int tls_set_ciphers(struct tls *tls, const char *cipherv[], size_t count)
 		enum tls_cipher_suite cs;
 
 		cs = tls_cipher_suite_resolve(cipherv[i]);
-		if (cs == TLS_NULL_WITH_NULL_NULL) {
+		if (cs == TLS_CIPHER_NULL_WITH_NULL_NULL) {
 			DEBUG_WARNING("cipher suite not supported: %s\n",
 				      cipherv[i]);
 			err = ENOTSUP;

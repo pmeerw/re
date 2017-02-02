@@ -35,14 +35,14 @@ static const struct tls_suite suites[] = {
  *                                       Exchange
  */
 
-{TLS_NULL_WITH_NULL_NULL,                K_NULL,       C_NULL,         M_NULL},
+{TLS_CIPHER_NULL_WITH_NULL_NULL,         K_NULL,       C_NULL,         M_NULL},
 
-{TLS_RSA_WITH_NULL_SHA,                  RSA,          C_NULL,         SHA   },
-{TLS_RSA_WITH_NULL_SHA256,               RSA,          C_NULL,         SHA256},
-{TLS_RSA_WITH_AES_128_CBC_SHA,           RSA,          AES_128_CBC,    SHA   },
-{TLS_RSA_WITH_AES_256_CBC_SHA,           RSA,          AES_256_CBC,    SHA   },
-{TLS_RSA_WITH_AES_128_CBC_SHA256,        RSA,          AES_128_CBC,    SHA256},
-{TLS_RSA_WITH_AES_256_CBC_SHA256,        RSA,          AES_256_CBC,    SHA256},
+{TLS_CIPHER_RSA_WITH_NULL_SHA,           RSA,          C_NULL,         SHA   },
+{TLS_CIPHER_RSA_WITH_NULL_SHA256,        RSA,          C_NULL,         SHA256},
+{TLS_CIPHER_RSA_WITH_AES_128_CBC_SHA,    RSA,          AES_128_CBC,    SHA   },
+{TLS_CIPHER_RSA_WITH_AES_256_CBC_SHA,    RSA,          AES_256_CBC,    SHA   },
+{TLS_CIPHER_RSA_WITH_AES_128_CBC_SHA256, RSA,          AES_128_CBC,    SHA256},
+{TLS_CIPHER_RSA_WITH_AES_256_CBC_SHA256, RSA,          AES_256_CBC,    SHA256},
 
 };
 
@@ -149,12 +149,12 @@ static const struct {
 	const char *name;
 } table[] = {
 
-	CIPH(TLS_RSA_WITH_NULL_SHA),
-	CIPH(TLS_RSA_WITH_NULL_SHA256),
-	CIPH(TLS_RSA_WITH_AES_128_CBC_SHA),
-	CIPH(TLS_RSA_WITH_AES_256_CBC_SHA),
-	CIPH(TLS_RSA_WITH_AES_128_CBC_SHA256),
-	CIPH(TLS_RSA_WITH_AES_256_CBC_SHA256),
+	CIPH(TLS_CIPHER_RSA_WITH_NULL_SHA),
+	CIPH(TLS_CIPHER_RSA_WITH_NULL_SHA256),
+	CIPH(TLS_CIPHER_RSA_WITH_AES_128_CBC_SHA),
+	CIPH(TLS_CIPHER_RSA_WITH_AES_256_CBC_SHA),
+	CIPH(TLS_CIPHER_RSA_WITH_AES_128_CBC_SHA256),
+	CIPH(TLS_CIPHER_RSA_WITH_AES_256_CBC_SHA256),
 };
 
 
@@ -162,22 +162,22 @@ const char *tls_cipher_suite_name(enum tls_cipher_suite cs)
 {
 	switch (cs) {
 
-	case TLS_NULL_WITH_NULL_NULL:
+	case TLS_CIPHER_NULL_WITH_NULL_NULL:
 		return "TLS_NULL_WITH_NULL_NULL";
 
-	case TLS_RSA_WITH_NULL_SHA:
+	case TLS_CIPHER_RSA_WITH_NULL_SHA:
 		return "TLS_RSA_WITH_NULL_SHA";
 
-	case TLS_RSA_WITH_AES_128_CBC_SHA:
+	case TLS_CIPHER_RSA_WITH_AES_128_CBC_SHA:
 		return "TLS_RSA_WITH_AES_128_CBC_SHA";
 
-	case TLS_RSA_WITH_AES_256_CBC_SHA:
+	case TLS_CIPHER_RSA_WITH_AES_256_CBC_SHA:
 		return "TLS_RSA_WITH_AES_256_CBC_SHA";
 
-	case TLS_RSA_WITH_AES_128_CBC_SHA256:
+	case TLS_CIPHER_RSA_WITH_AES_128_CBC_SHA256:
 		return "TLS_RSA_WITH_AES_128_CBC_SHA256";
 
-	case TLS_RSA_WITH_AES_256_CBC_SHA256:
+	case TLS_CIPHER_RSA_WITH_AES_256_CBC_SHA256:
 		return "TLS_RSA_WITH_AES_256_CBC_SHA256";
 
 	default:
@@ -189,9 +189,11 @@ const char *tls_cipher_suite_name(enum tls_cipher_suite cs)
 enum tls_cipher_suite tls_cipher_suite_resolve(const char *name)
 {
 	size_t i;
+
 	for (i=0; i<ARRAY_SIZE(table); i++) {
 		if (0 == str_casecmp(name, table[i].name))
 			return table[i].cs;
 	}
-	return TLS_NULL_WITH_NULL_NULL;
+
+	return TLS_CIPHER_NULL_WITH_NULL_NULL;
 }

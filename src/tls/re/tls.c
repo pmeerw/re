@@ -9,7 +9,7 @@
 #include <re_fmt.h>
 #include <re_mem.h>
 #include <re_mbuf.h>
-#include <re_main.h>
+#include <re_list.h>
 #include <re_sa.h>
 #include <re_net.h>
 #include <re_srtp.h>
@@ -25,9 +25,14 @@
 #include <re_dbg.h>
 
 
+# define SRTP_AES128_CM_SHA1_80 0x0001
+# define SRTP_AES128_CM_SHA1_32 0x0002
+
+
 /* NOTE: shadow struct defined in tls_*.c */
 struct tls_conn {
 	struct tls_session *ssl;
+	struct tls *tls;
 };
 
 
@@ -47,9 +52,12 @@ static void destructor(void *data)
 {
 	struct tls *tls = data;
 
+	re_printf("\n -- context summary --\n");
+	re_printf("Local %H\n", tls_extensions_print, &tls->exts_local);
+
 	mem_deref(tls->suitev);
 	mem_deref(tls->cert);
-	mem_deref(tls->pass);
+	list_flush(&tls->exts_local);
 }
 
 
@@ -101,11 +109,6 @@ int tls_alloc(struct tls **tlsp, enum tls_method method, const char *keyfile,
 
 	/* Load our keys and certificates */
 	if (keyfile) {
-		if (pwd) {
-			err = str_dup(&tls->pass, pwd);
-			if (err)
-				goto out;
-		}
 
 		err = cert_load_file(&tls->cert, keyfile);
 		if (err)
@@ -182,12 +185,61 @@ void tls_set_verify_client(struct tls *tls)
 }
 
 
+static uint16_t profile_decode(const struct pl *pl)
+{
+	if (!pl_strcasecmp(pl, "SRTP_AES128_CM_SHA1_80"))
+		return SRTP_AES128_CM_SHA1_80;
+	else if (!pl_strcasecmp(pl, "SRTP_AES128_CM_SHA1_32"))
+		return SRTP_AES128_CM_SHA1_32;
+	else {
+		return 0;
+	}
+}
+
+
 int tls_set_srtp(struct tls *tls, const char *suites)
 {
-	(void)tls;
-	(void)suites;
+	struct tls_extension *ext;
+	struct pl pl;
+	size_t i=0;
+	int err;
 
-	return ENOSYS;
+	if (!tls || !suites)
+		return EINVAL;
+
+	err = tls_extension_add(&ext, &tls->exts_local, TLS_EXT_USE_SRTP);
+	if (err)
+		return err;
+
+	pl_set_str(&pl, suites);
+
+	while (pl.l) {
+		struct pl pl_suite, pl_colon;
+		uint16_t profile;
+
+		err = re_regex(pl.p, pl.l, "[^:]+[:]*", &pl_suite, &pl_colon);
+		if (err) {
+			DEBUG_WARNING("invalid suites string\n");
+			goto out;
+		}
+
+		profile = profile_decode(&pl_suite);
+		if (!profile) {
+			DEBUG_WARNING("suite not supported: %r\n", &pl_suite);
+			err = ENOTSUP;
+			goto out;
+		}
+
+		ext->v.use_srtp.profilev[i] = profile;
+
+		++i;
+		pl_advance(&pl, pl_suite.l + pl_colon.l);
+	}
+
+	ext->v.use_srtp.profilec = i;
+	re_printf("added %zu profiles\n", i);
+ out:
+	return err;
 }
 
 
@@ -282,18 +334,103 @@ int tls_peer_verify(const struct tls_conn *tc)
 }
 
 
+#define LABEL_LEN 19
 int tls_srtp_keyinfo(const struct tls_conn *tc, enum srtp_suite *suite,
 		     uint8_t *cli_key, size_t cli_key_size,
 		     uint8_t *srv_key, size_t srv_key_size)
 {
-	(void)tc;
-	(void)suite;
-	(void)cli_key;
-	(void)cli_key_size;
-	(void)srv_key;
-	(void)srv_key_size;
+	static const uint8_t label[LABEL_LEN] = "EXTRACTOR-dtls_srtp";
+	struct tls_secparam *secparam;
+	struct tls_extension *extl, *extr;
+	size_t key_size, salt_size;
+	uint16_t common_profile = 0;
+	uint8_t output[2 * 30];
+	uint8_t seed[TLS_CLIENT_RANDOM_LEN + TLS_SERVER_RANDOM_LEN];
+	uint8_t *sp = seed, *p;
+	size_t i, j;
+	int err;
 
-	return ENOSYS;
+	if (!tc || !suite || !cli_key || !srv_key)
+		return EINVAL;
+
+	extl = tls_extension_find(&tc->tls->exts_local, TLS_EXT_USE_SRTP);
+	extr = tls_extension_find(tls_session_remote_exts(tc->ssl),
+				 TLS_EXT_USE_SRTP);
+	if (!extl) {
+		DEBUG_WARNING("keyinfo: no local extensions\n");
+		return ENOENT;
+	}
+	if (!extr) {
+		DEBUG_WARNING("keyinfo: no remote extensions\n");
+		return ENOENT;
+	}
+
+	/* find a common SRTP profile */
+	for (i=0; i<extr->v.use_srtp.profilec && !common_profile; i++) {
+
+		uint16_t rprofile = extr->v.use_srtp.profilev[i];
+
+		re_printf("    remote_profile: 0x%04x\n", rprofile);
+
+		for (j=0; j<extl->v.use_srtp.profilec; j++) {
+
+			uint16_t lprofile = extl->v.use_srtp.profilev[j];
+			if (rprofile == lprofile) {
+				common_profile = rprofile;
+				break;
+			}
+		}
+	}
+	if (!common_profile) {
+		DEBUG_WARNING("keyinfo: no common srtp profile\n");
+		return ENOENT;
+	}
+
+	switch (common_profile) {
+
+	case SRTP_AES128_CM_SHA1_80:
+		*suite = SRTP_AES_CM_128_HMAC_SHA1_80;
+		key_size  = 16;
+		salt_size = 14;
+		break;
+
+	case SRTP_AES128_CM_SHA1_32:
+		*suite = SRTP_AES_CM_128_HMAC_SHA1_32;
+		key_size  = 16;
+		salt_size = 14;
+		break;
+
+	default:
+		DEBUG_WARNING("keyinfo: unsupported profile 0x%04x\n",
+			      common_profile);
+		return ENOSYS;
+	}
+
+	bool write = true; // XXX read or write ?
+
+	secparam = tls_session_secparam(tc->ssl, write);
+
+	memcpy(sp, secparam->client_random, TLS_CLIENT_RANDOM_LEN);
+	sp += TLS_CLIENT_RANDOM_LEN;
+	memcpy(sp, secparam->server_random, TLS_SERVER_RANDOM_LEN);
+
+	err = tls_prf_sha256(output, sizeof(output),
+			     secparam->master_secret, TLS_MASTER_SECRET_LEN,
+			     label, LABEL_LEN,
+			     seed, sizeof(seed));
+	if (err) {
+		DEBUG_WARNING("srtp_keyinfo: prf_sha256 failed (%m)\n", err);
+		return err;
+	}
+
+	p = output;
+
+	memcpy(cli_key,            p, key_size);  p += key_size;
+	memcpy(srv_key,            p, key_size);  p += key_size;
+	memcpy(cli_key + key_size, p, salt_size); p += salt_size;
+	memcpy(srv_key + key_size, p, salt_size);
+
+	return 0;
 }
 
 

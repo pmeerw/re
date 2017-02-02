@@ -468,14 +468,14 @@ typedef void (tls_sess_close_h)(int err, void *arg);
 
 struct tls_session;
 
-int  tls_session_alloc(struct tls_session **sessp,
-			enum tls_connection_end conn_end,
-			enum tls_version ver,
-			const enum tls_cipher_suite *cipherv, size_t cipherc,
-			tls_sess_send_h *sendh,
-			tls_sess_estab_h *estabh,
-			tls_data_recv_h *datarecvh,
-			tls_sess_close_h *closeh, void *arg);
+int  tls_session_alloc(struct tls_session **sessp, struct tls *tls,
+		       enum tls_connection_end conn_end,
+		       enum tls_version ver,
+		       const enum tls_cipher_suite *cipherv, size_t cipherc,
+		       tls_sess_send_h *sendh,
+		       tls_sess_estab_h *estabh,
+		       tls_data_recv_h *datarecvh,
+		       tls_sess_close_h *closeh, void *arg);
 int  tls_session_start(struct tls_session *sess);
 struct tls_secparam *tls_session_secparam(struct tls_session *sess,
 						 bool write);

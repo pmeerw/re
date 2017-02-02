@@ -114,7 +114,9 @@ TCP transport .................... YES
 Multiple handshakes per record ... YES
 Multiple records per handshake ... YES
 
-Extensions: ...................... None
+Extensions:
+usr_srtp (RFC 5764) .............. YES
+
 PRF P_SHA256 ......................YES
 
 Debug tracing .....................YES

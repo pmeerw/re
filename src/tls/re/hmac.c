@@ -7,6 +7,7 @@
 #include <re_types.h>
 #include <re_fmt.h>
 #include <re_mem.h>
+#include <re_list.h>
 #include <re_hmac.h>
 #include <re_srtp.h>
 #include <re_tls.h>

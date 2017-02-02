@@ -44,11 +44,11 @@ struct dtls_sock {
 /* NOTE: shadow struct defined in tls_*.c */
 struct tls_conn {
 	struct tls_session *ssl;  /* inheritance */
+	struct tls *tls;
 
 	struct sa peer;
 	struct le he;
 	struct dtls_sock *sock;
-	struct tls *tls;
 	dtls_estab_h *estabh;
 	dtls_recv_h *recvh;
 	dtls_close_h *closeh;
@@ -131,7 +131,7 @@ static int tls_connect(struct tls_conn *tc)
 
 	if (!tc->ssl) {
 
-		err = tls_session_alloc(&tc->ssl,
+		err = tls_session_alloc(&tc->ssl, tls,
 					 TLS_CLIENT,
 					 tls->version ,
 					 tls->suitev, tls->suitec,
@@ -159,7 +159,7 @@ static int tls_accept(struct tls_conn *tc)
 
 	if (!tc->ssl) {
 
-		err = tls_session_alloc(&tc->ssl,
+		err = tls_session_alloc(&tc->ssl, tls,
 					 TLS_SERVER,
 					 tls->version ,
 					 tls->suitev, tls->suitec,

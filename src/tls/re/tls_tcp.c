@@ -8,6 +8,7 @@
 #include <re_fmt.h>
 #include <re_mem.h>
 #include <re_mbuf.h>
+#include <re_list.h>
 #include <re_main.h>
 #include <re_sa.h>
 #include <re_net.h>
@@ -92,7 +93,7 @@ static int tls_connect(struct tls_conn *tc)
 
 	if (!tc->ssl) {
 
-		err = tls_session_alloc(&tc->ssl,
+		err = tls_session_alloc(&tc->ssl, tls,
 					 TLS_CLIENT,
 					 tls->version ,
 					 tls->suitev, tls->suitec,
@@ -120,7 +121,7 @@ static int tls_accept(struct tls_conn *tc)
 
 	if (!tc->ssl) {
 
-		err = tls_session_alloc(&tc->ssl,
+		err = tls_session_alloc(&tc->ssl, tls,
 					 TLS_SERVER,
 					 tls->version ,
 					 tls->suitev, tls->suitec,

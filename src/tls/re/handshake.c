@@ -8,6 +8,7 @@
 #include <re_types.h>
 #include <re_fmt.h>
 #include <re_mem.h>
+#include <re_list.h>
 #include <re_mbuf.h>
 #include <re_net.h>
 #include <re_cert.h>
@@ -101,6 +102,10 @@ static int clienthello_encode(struct mbuf *mb, const struct clienthello *hello)
 	err |= tls_vector_encode(mb, &hello->cipher_suites, 2);
 	err |= tls_vector_encode(mb, &hello->compression_methods, 1);
 
+	if (hello->extensions.bytes) {
+		err |= tls_vector_encode(mb, &hello->extensions, 2);
+	}
+
 	return err;
 }
 
@@ -162,6 +167,12 @@ static int serverhello_encode(struct mbuf *mb, const struct serverhello *hello)
 	err |= tls_vector_encode(mb, &hello->session_id, 1);
 	err |= mbuf_write_u16(mb, htons(hello->cipher_suite));
 	err |= mbuf_write_u8(mb, hello->compression_method);
+
+	re_printf("serverhello: ext %zu bytes\n", hello->extensions.bytes);
+
+	if (hello->extensions.bytes) {
+		err |= tls_vector_encode(mb, &hello->extensions, 2);
+	}
 
 	return err;
 }

@@ -9,6 +9,7 @@
 #include <re_fmt.h>
 #include <re_mem.h>
 #include <re_mbuf.h>
+#include <re_list.h>
 #include <re_sys.h>
 #include <re_cert.h>
 #include <re_sha.h>
@@ -39,7 +40,10 @@
 #define MBUF_HEADROOM 4
 
 
+/* XXX: split into client.c and server.c */
 struct tls_session {
+	const struct tls *tls;               /* pointer to parent context */
+
 	struct tls_secparam sp_write;
 	struct tls_secparam sp_read;
 
@@ -104,6 +108,8 @@ struct tls_session {
 	size_t record_bytes_read;
 	size_t record_fragment_size;
 	uint64_t next_receive_seq;  /* DTLS only */
+
+	struct list exts_remote;
 };
 
 
@@ -478,12 +484,24 @@ static int send_clienthello(struct tls_session *sess)
 	hello->compression_methods.bytes = 1;
 	hello->compression_methods.data = compr_methods;
 
+	/* Local extensions */
+	if (sess->tls && !list_isempty(&sess->tls->exts_local)) {
+
+		err = tls_extensions_encode(&hello->extensions,
+					    &sess->tls->exts_local);
+		if (err) {
+			DEBUG_WARNING("ext encode error (%m)\n", err);
+			goto out;
+		}
+	}
+
 	err = handshake_layer_send(sess, TLS_CLIENT_HELLO, &hand,
 				   true, false);
 	if (err)
 		goto out;
 
  out:
+	tls_vector_reset(&hello->extensions);
 	mem_deref(datav);
 	return err;
 }
@@ -493,7 +511,7 @@ static int send_serverhello(struct tls_session *sess)
 {
 	union handshake hand;
 	struct serverhello *hello = &hand.serverhello;
-	int err;
+	int err = 0;
 
 	memset(&hand, 0, sizeof(hand));
 
@@ -509,12 +527,25 @@ static int send_serverhello(struct tls_session *sess)
 	hello->cipher_suite = sess->selected_cipher_suite;
 	hello->compression_method = TLS_COMPRESSION_NULL;
 
-	/* No extensions */
+	/* Local extensions */
+	// XXX: intersect with remote
+	if (sess->tls && !list_isempty(&sess->tls->exts_local)) {
+
+		err = tls_extensions_encode(&hello->extensions,
+					    &sess->tls->exts_local);
+		if (err) {
+			DEBUG_WARNING("ext encode error (%m)\n", err);
+			goto out;
+		}
+	}
 
 	err = handshake_layer_send(sess, TLS_SERVER_HELLO, &hand,
 				   false, false);
 	if (err)
-		return err;
+		goto out;
+
+ out:
+	tls_vector_reset(&hello->extensions);
 
 	return 0;
 }
@@ -575,6 +606,11 @@ static void destructor(void *data)
 {
 	struct tls_session *sess = data;
 
+	sess->tls = NULL;
+
+	re_printf("\n -- session summary --\n");
+	re_printf("Remote %H\n", tls_extensions_print, &sess->exts_remote);
+
 	/* send close notify alert, if session was established */
 	if (sess->estab)
 		send_alert(sess, TLS_LEVEL_WARNING, TLS_ALERT_CLOSE_NOTIFY);
@@ -585,10 +621,12 @@ static void destructor(void *data)
 	mem_deref(sess->cert_local);
 	mem_deref(sess->cert_remote);
 	mem_deref(sess->cipherv);
+	list_flush(&sess->exts_remote);
 }
 
 
 int  tls_session_alloc(struct tls_session **sessp,
+		       struct tls *tls,
 			enum tls_connection_end conn_end,
 			enum tls_version ver,
 			const enum tls_cipher_suite *cipherv, size_t cipherc,
@@ -620,6 +658,7 @@ int  tls_session_alloc(struct tls_session **sessp,
 	if (!sess)
 		return ENOMEM;
 
+	sess->tls = tls;
 	sess->conn_end = conn_end;
 	sess->version = ver;
 
@@ -843,6 +882,7 @@ static int encrypt_send_record(struct tls_session *sess,
 		goto out;
 
  out:
+	// TODO: crash in mem_deref, written past end (trailer)
 	mem_deref(mb_enc);
 	return err;
 }
@@ -1056,6 +1096,8 @@ out:
 static int client_handle_server_hello(struct tls_session *sess,
 				      const struct serverhello *hell)
 {
+	int err = 0;
+
 	/* save the Server-random */
 	mem_cpy(sess->sp_read.server_random,
 		sizeof(sess->sp_read.server_random),
@@ -1080,7 +1122,23 @@ static int client_handle_server_hello(struct tls_session *sess,
 		return EPROTO;
 	}
 
-	return 0;
+	/* decode extensions from remote */
+	if (hell->extensions.bytes) {
+
+		re_printf("ServerHello: ext %zu bytes\n",
+			  hell->extensions.bytes);
+
+		err = tls_extensions_decode(&sess->exts_remote,
+					    &hell->extensions);
+		if (err) {
+			DEBUG_WARNING("server_hello: extension error"
+				      " (%m)\n", err);
+			goto out;
+		}
+	}
+
+ out:
+	return err;
 }
 
 
@@ -1147,6 +1205,17 @@ static int server_handle_client_hello(struct tls_session *sess,
 			   TLS_ALERT_HANDSHAKE_FAILURE);
 		err = EPROTO;
 		goto out;
+	}
+
+	/* decode extensions from Client */
+	if (chell->extensions.bytes) {
+
+		err = tls_extensions_decode(&sess->exts_remote,
+					    &chell->extensions);
+		if (err) {
+			DEBUG_WARNING("extension error (%m)\n", err);
+			goto out;
+		}
 	}
 
 	/* save the Client-random */
@@ -2036,4 +2105,10 @@ void tls_session_shutdown(struct tls_session *sess)
 	sess->closed = true;
 
 	send_alert(sess, TLS_LEVEL_FATAL, TLS_ALERT_CLOSE_NOTIFY);
+}
+
+
+const struct list *tls_session_remote_exts(const struct tls_session *sess)
+{
+	return sess ? &sess->exts_remote : NULL;
 }

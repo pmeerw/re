@@ -44,7 +44,7 @@ struct dtls_sock {
 /* NOTE: shadow struct defined in tls_*.c */
 struct tls_conn {
 	struct tls_session *ssl;  /* inheritance */
-	struct tls *tls;
+	struct tls *tls;          /* inheritance */
 
 	struct sa peer;
 	struct le he;

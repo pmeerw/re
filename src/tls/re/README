@@ -115,6 +115,7 @@ Multiple handshakes per record ... YES
 Multiple records per handshake ... YES
 
 Extensions:
+server_name (RFC 6066) ........... YES
 usr_srtp (RFC 5764) .............. YES
 
 PRF P_SHA256 ......................YES

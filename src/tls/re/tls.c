@@ -52,8 +52,10 @@ static void destructor(void *data)
 {
 	struct tls *tls = data;
 
+#if 0
 	re_printf("\n -- context summary --\n");
 	re_printf("Local %H\n", tls_extensions_print, &tls->exts_local);
+#endif
 
 	mem_deref(tls->suitev);
 	mem_deref(tls->cert);
@@ -440,4 +442,46 @@ const char *tls_cipher_name(const struct tls_conn *tc)
 		return NULL;
 
 	return tls_cipher_suite_name(tls_session_cipher(tc->ssl));
+}
+
+
+int tls_set_servername(struct tls_conn *tc, const char *servername)
+{
+	struct tls_extension *ext;
+	struct tls *tls;
+	int err;
+
+	tls = tc->tls; // XXX not correct
+
+	err = tls_extension_add(&ext, &tls->exts_local, TLS_EXT_SERVER_NAME);
+	if (err)
+		return err;
+
+	ext->v.server_name.type = 0;
+	err = str_dup(&ext->v.server_name.host, servername);
+
+	return err;
+}
+
+
+int tls_get_servername(struct tls_conn *tc, char *servername, size_t sz)
+{
+	struct tls_extension *ext;
+
+	if (!tc || !servername || !sz)
+		return EINVAL;
+
+	ext = tls_extension_find(tls_session_remote_exts(tc->ssl),
+				 TLS_EXT_SERVER_NAME);
+	if (!ext) {
+		DEBUG_WARNING("remote server_name is missing\n");
+		return ENOENT;
+	}
+
+	if (ext->v.server_name.type != 0)
+		return ENOTSUP;
+
+	str_ncpy(servername, ext->v.server_name.host, sz);
+
+	return 0;
 }

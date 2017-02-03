@@ -65,6 +65,7 @@ int tls_srtp_keyinfo(const struct tls_conn *tc, enum srtp_suite *suite,
 const char *tls_cipher_name(const struct tls_conn *tc);
 int tls_set_ciphers(struct tls *tls, const char *cipherv[], size_t count);
 int tls_set_servername(struct tls_conn *tc, const char *servername);
+int tls_get_servername(struct tls_conn *tc, char *servername, size_t sz);
 
 
 /* TCP */

@@ -26,10 +26,10 @@
 /* NOTE: shadow struct defined in tls_*.c */
 struct tls_conn {
 	struct tls_session *ssl;  /* inheritance */
+	struct tls *tls;          /* inheritance */
 
 	struct tcp_helper *th;
 	struct tcp_conn *tcp;
-	struct tls *tls;
 	struct mbuf *mb;
 	bool active;
 	bool up;

@@ -31,6 +31,16 @@ static void ext_destructor(void *data)
 {
 	struct tls_extension *ext = data;
 
+	switch (ext->type) {
+
+	case TLS_EXT_SERVER_NAME:
+		mem_deref(ext->v.server_name.host);
+		break;
+
+	default:
+		break;
+	}
+
 	list_unlink(&ext->le);
 }
 
@@ -82,6 +92,16 @@ int tls_extensions_encode(struct tls_vector *vect,
 
 		switch (ext->type) {
 
+		case TLS_EXT_SERVER_NAME: {
+			size_t len = str_len(ext->v.server_name.host);
+
+			err |= mbuf_write_u16(mb, htons(len + 3));
+			err |= mbuf_write_u8(mb, ext->v.server_name.type);
+			err |= mbuf_write_u16(mb, htons(len));
+			err |= mbuf_write_str(mb, ext->v.server_name.host);
+		}
+			break;
+
 		case TLS_EXT_USE_SRTP:
 			for (i=0; i<ext->v.use_srtp.profilec; i++) {
 				uint16_t prof = ext->v.use_srtp.profilev[i];
@@ -94,13 +114,13 @@ int tls_extensions_encode(struct tls_vector *vect,
 			err = ENOTSUP;
 			goto out;
 		}
+		if (err)
+			goto out;
 
 		length = mb->pos - pos - 2;
 		mb->pos = pos;
 		err = mbuf_write_u16(mb, htons(length));
 		mb->pos  = pos + 2 + length;
-
-		re_printf("encoded ext %d, %zu bytes\n", ext->type, length);
 	}
 
 	vect->data = mem_ref(mb->buf);
@@ -130,17 +150,22 @@ int tls_extensions_decode(struct list *extl,
 		struct tls_extension *ext;
 		uint16_t type, length;
 		size_t i, n;
+		size_t stop;
 
 		type   = ntohs(mbuf_read_u16(&mb));
 		length = ntohs(mbuf_read_u16(&mb));
 
-		if (length > mbuf_get_left(&mb)) {
-			DEBUG_WARNING("extension short length\n");
+		if (mbuf_get_left(&mb) < length) {
+			DEBUG_WARNING("extension short length (%zu < %u bytes)"
+				      "\n",
+				      mbuf_get_left(&mb), length);
 			return EBADMSG;
 		}
 
-		re_printf("## ext: %u (%s) %u bytes\n", type,
+#if 0
+		re_printf("## ext: decode %u (%s) %u bytes\n", type,
 			  tls_extension_name(type), length);
+#endif
 
 		err = tls_extension_add(&ext, extl, type);
 		if (err)
@@ -148,8 +173,33 @@ int tls_extensions_decode(struct list *extl,
 
 		ext->length = length;
 
+		stop = mb.pos + length;
+
 		/* decode any known extensions */
 		switch (type) {
+
+		case TLS_EXT_SERVER_NAME: {
+
+			uint16_t sni_list_length;
+			uint16_t sni_length;
+
+			if (length == 0)
+				break;
+
+			sni_list_length = ntohs(mbuf_read_u16(&mb));
+
+			if (mbuf_get_left(&mb) < sni_list_length) {
+				DEBUG_WARNING("sni: short length\n");
+				return EBADMSG;
+			}
+
+			ext->v.server_name.type = mbuf_read_u8(&mb);
+			sni_length = ntohs(mbuf_read_u16(&mb));
+
+			err = mbuf_strdup(&mb, &ext->v.server_name.host,
+					  sni_length);
+		}
+			break;
 
 		case TLS_EXT_USE_SRTP:
 			n = length / 2;
@@ -169,7 +219,7 @@ int tls_extensions_decode(struct list *extl,
 			break;
 		}
 
-		mb.pos += length;
+		mb.pos = stop;
 	}
 
 	return err;
@@ -193,6 +243,12 @@ static int tls_extension_print(struct re_printf *pf,
 
 	/* print all known extensions */
 	switch (ext->type) {
+
+	case TLS_EXT_SERVER_NAME:
+		err = re_hprintf(pf, " type=%u host='%s'",
+				 ext->v.server_name.type,
+				 ext->v.server_name.host);
+		break;
 
 	case TLS_EXT_USE_SRTP:
 		err = re_hprintf(pf, " profiles=[ ");
@@ -253,6 +309,7 @@ const char *tls_extension_name(enum tls_extension_type ext)
 {
 	switch (ext) {
 
+	case TLS_EXT_SERVER_NAME:           return "server_name";
 	case TLS_EXT_USE_SRTP:              return "use_srtp";
 	default:                            return "???";
 	}

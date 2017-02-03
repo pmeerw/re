@@ -168,8 +168,6 @@ static int serverhello_encode(struct mbuf *mb, const struct serverhello *hello)
 	err |= mbuf_write_u16(mb, htons(hello->cipher_suite));
 	err |= mbuf_write_u8(mb, hello->compression_method);
 
-	re_printf("serverhello: ext %zu bytes\n", hello->extensions.bytes);
-
 	if (hello->extensions.bytes) {
 		err |= tls_vector_encode(mb, &hello->extensions, 2);
 	}

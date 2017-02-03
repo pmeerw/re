@@ -608,8 +608,10 @@ static void destructor(void *data)
 
 	sess->tls = NULL;
 
+#if 0
 	re_printf("\n -- session summary --\n");
 	re_printf("Remote %H\n", tls_extensions_print, &sess->exts_remote);
+#endif
 
 	/* send close notify alert, if session was established */
 	if (sess->estab)
@@ -1124,9 +1126,6 @@ static int client_handle_server_hello(struct tls_session *sess,
 
 	/* decode extensions from remote */
 	if (hell->extensions.bytes) {
-
-		re_printf("ServerHello: ext %zu bytes\n",
-			  hell->extensions.bytes);
 
 		err = tls_extensions_decode(&sess->exts_remote,
 					    &hell->extensions);

@@ -45,6 +45,7 @@ void mem_cpy(uint8_t *dst, size_t dst_sz,
  */
 
 enum tls_extension_type {
+	TLS_EXT_SERVER_NAME = 0, /* RFC 6066 */
 	TLS_EXT_USE_SRTP = 14,  /* RFC 5764 */
 };
 
@@ -56,6 +57,11 @@ struct tls_extension {
 	//struct tls_vector data;
 
 	union {
+		struct {
+			uint8_t type;
+			char *host;
+		} server_name;
+
 		struct {
 			uint16_t profilev[4];
 			size_t profilec;

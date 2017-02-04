@@ -241,3 +241,18 @@ Bugs:
 $ openssl s_server -cert /etc/restund/creytiv.pem -accept 4433 -state -dtls1_2
 cert: unable to parse certificate 950 bytes in memory at offset 0
 
+
+Common testing commands:
+-----------------------
+
+$ openssl s_client -connect 127.0.0.1:4433 -cipher NULL
+
+
+
+TODO:
+----
+
+- Transport Layer Security (TLS) Renegotiation Indication Extension
+  https://tools.ietf.org/html/rfc5746
+
+

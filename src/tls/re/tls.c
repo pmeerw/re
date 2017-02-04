@@ -277,7 +277,8 @@ int tls_set_ciphers(struct tls *tls, const char *cipherv[], size_t count)
 
 		cs = tls_cipher_suite_resolve(cipherv[i]);
 		if (cs == TLS_CIPHER_NULL_WITH_NULL_NULL) {
-			DEBUG_WARNING("cipher suite not supported: %s\n",
+			DEBUG_WARNING("set_ciphers: cipher suite"
+				      " not supported: %s\n",
 				      cipherv[i]);
 			err = ENOTSUP;
 			goto out;
@@ -456,7 +457,14 @@ int tls_set_servername(struct tls_conn *tc, const char *servername)
 	struct tls *tls;
 	int err;
 
+	if (!tc || !servername)
+		return EINVAL;
+
 	tls = tc->tls; // XXX not correct
+	if (!tls) {
+		DEBUG_WARNING("set_servername: no tls context\n");
+		return ENOTSUP;
+	}
 
 	err = tls_extension_add(&ext, &tls->exts_local, TLS_EXT_SERVER_NAME);
 	if (err)

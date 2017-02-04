@@ -649,7 +649,7 @@ int  tls_session_alloc(struct tls_session **sessp,
 		enum tls_cipher_suite cs = cipherv[i];
 
 		if (!tls_suite_lookup(cs)) {
-			DEBUG_WARNING("cipher suite not supported"
+			DEBUG_WARNING("alloc: cipher suite not supported"
 				      " 0x%04x (%s)\n",
 				      cs, tls_cipher_suite_name(cs));
 			return ENOTSUP;
@@ -1683,16 +1683,29 @@ static void handle_cleartext_record(struct tls_session *sess,
 }
 
 
-static int tls_session_record_decode(struct tls_session *sess,
-			       struct tls_record **recp, struct mbuf *mb)
+static int print_record_prefix(struct re_printf *pf,
+			       const struct tls_record *rec)
 {
-	size_t start, stop;
+	int err = 0;
+
+	if (!rec)
+		return 0;
+
+	if (tls_version_is_dtls(rec->proto_ver)) {
+		err = re_hprintf(pf, "seq={%u.%llu} ", rec->epoch, rec->seq);
+	}
+
+	return err;
+}
+
+
+static int session_record_decode(struct tls_session *sess,
+				 struct tls_record **recp, struct mbuf *mb)
+{
 	struct tls_record *rec = NULL;
+	size_t start, stop;
 	size_t data_start;
 	int err;
-
-	if (!sess || !recp || !mb)
-		return EINVAL;
 
 	start = mb->pos;
 
@@ -1703,9 +1716,9 @@ static int tls_session_record_decode(struct tls_session *sess,
 	stop = start + tls_record_hdrsize(rec->proto_ver) + rec->length;
 
 	tls_trace(sess, TLS_TRACE_RECORD,
-		   "{%u.%llu} decode type '%s' fragment_length=%zu\n",
-		   rec->epoch, rec->seq,
-		   tls_content_type_name(rec->content_type), rec->length);
+		  "%Hdecode type '%s' fragment_length=%u\n",
+		  print_record_prefix, rec,
+		  tls_content_type_name(rec->content_type), rec->length);
 
 	if (tls_version_is_dtls(sess->version)) {
 
@@ -1889,7 +1902,7 @@ void tls_session_recvtcp(struct tls_session *sess, struct mbuf *mb)
 
 		pos = sess->mb->pos;
 
-		err = tls_session_record_decode(sess, &rec, sess->mb);
+		err = session_record_decode(sess, &rec, sess->mb);
 		if (err) {
 			sess->mb->pos = pos;
 			if (err == ENODATA)
@@ -1926,7 +1939,7 @@ void tls_session_recvudp(struct tls_session *sess, struct mbuf *mb)
 
 	while (mbuf_get_left(mb) >= 5) {
 
-		err = tls_session_record_decode(sess, &rec, mb);
+		err = session_record_decode(sess, &rec, mb);
 		if (err)
 			break;
 

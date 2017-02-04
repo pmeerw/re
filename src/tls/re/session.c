@@ -1,10 +1,11 @@
 /**
  * @file session.c TLS session
  *
- * Copyright (C) 2010 - 2016 Creytiv.com
+ * Copyright (C) 2010 - 2017 Creytiv.com
  */
 
 #include <string.h>
+#include <assert.h>
 #include <re_types.h>
 #include <re_fmt.h>
 #include <re_mem.h>
@@ -146,7 +147,7 @@ static int handshake_layer_send(struct tls_session *sess,
 		   "send handshake: type=%s\n",
 		   tls_handshake_name(msg_type));
 
-	mb = mbuf_alloc(512);
+	mb = mbuf_alloc(32);
 	if (!mb)
 		return ENOMEM;
 
@@ -698,7 +699,7 @@ int  tls_session_alloc(struct tls_session **sessp,
 
 	SHA256_Init(&sess->hand_ctx);
 
-	sess->mb_write = mbuf_alloc(512);
+	sess->mb_write = mbuf_alloc(64);
 	if (!sess->mb_write) {
 		err = ENOMEM;
 		goto out;
@@ -807,7 +808,7 @@ static int send_clientkeyexchange(struct tls_session *sess)
 static int encrypt_send_record(struct tls_session *sess,
 			       enum tls_content_type type, struct mbuf *data)
 {
-	struct mbuf *mb_enc = mbuf_alloc(1024);
+	struct mbuf *mb_enc = mbuf_alloc(64);
 	uint8_t mac[MAX_MAC_SIZE];
 	size_t mac_sz = sess->sp_write.mac_length;
 	int err = 0;
@@ -873,6 +874,9 @@ static int encrypt_send_record(struct tls_session *sess,
 
 	case TLS_BULKCIPHER_AES:
 		err = tls_crypt_encrypt(write_key, mb_enc, data);
+
+		assert(mb_enc->pos <= mb_enc->size);
+		assert(mb_enc->end <= mb_enc->size);
 		break;
 
 	default:
@@ -895,7 +899,6 @@ static int encrypt_send_record(struct tls_session *sess,
 		goto out;
 
  out:
-	// TODO: crash in mem_deref, written past end (trailer)
 	mem_deref(mb_enc);
 	return err;
 }
@@ -1525,7 +1528,7 @@ static int handle_handshake_fragment(struct tls_session *sess,
 	 * Part I -- write record to handshake buffer
 	 */
 	if (!sess->hand_mb) {
-		sess->hand_mb = mbuf_alloc(512);
+		sess->hand_mb = mbuf_alloc(64);
 		if (!sess->hand_mb)
 			return ENOMEM;
 	}
@@ -1699,21 +1702,15 @@ static int print_record_prefix(struct re_printf *pf,
 }
 
 
-static int session_record_decode(struct tls_session *sess,
-				 struct tls_record **recp, struct mbuf *mb)
+static int handle_record(struct tls_session *sess, struct tls_record *rec)
 {
-	struct tls_record *rec = NULL;
-	size_t start, stop;
-	size_t data_start;
+	struct mbuf mb_wrap, *mb = &mb_wrap;
 	int err;
 
-	start = mb->pos;
-
-	err = tls_record_header_decode(&rec, mb);
-	if (err)
-		goto out;
-
-	stop = start + tls_record_hdrsize(rec->proto_ver) + rec->length;
+	mb_wrap.buf = rec->fragment;
+	mb_wrap.pos = 0;
+	mb_wrap.end = rec->length;
+	mb_wrap.size = rec->length;
 
 	tls_trace(sess, TLS_TRACE_RECORD,
 		  "%Hdecode type '%s' fragment_length=%u\n",
@@ -1732,30 +1729,31 @@ static int session_record_decode(struct tls_session *sess,
 			DEBUG_INFO("discard message: epoch_seq=%u.%llu\n",
 				   rec->epoch, rec->seq);
 
-			mb->pos = stop;
-			goto out;
+			//mb->pos = stop;
+			return 0;
 		}
 	}
-
-	data_start = mb->pos;
 
 	switch (sess->sp_read.bulk_cipher_algorithm) {
 
 	case TLS_BULKCIPHER_NULL:
-		//rec->length -= sess->sp_read.mac_length;
+		rec->length -= sess->sp_read.mac_length;
+		mb->end -= sess->sp_read.mac_length;
 		break;
 
 	case TLS_BULKCIPHER_AES:
 		err = record_decrypt_aes_and_unmac(sess, rec, mb);
+		if (err)
+			return err;
+		assert(mb->pos <= mb->size);
+		assert(mb->end <= mb->size);
 		break;
 
 	default:
 		DEBUG_WARNING("session_record_decode: unknown"
 			      " bulk cipher algo %d\n",
 			      sess->sp_read.bulk_cipher_algorithm);
-		err = ENOTSUP;
-		goto out;
-		break;
+		return ENOTSUP;
 	}
 	if (err) {
 		DEBUG_WARNING("session: record decrypt error "
@@ -1764,7 +1762,7 @@ static int session_record_decode(struct tls_session *sess,
 		goto out;
 	}
 
-	mb->pos = data_start;
+	mb->pos = 0;
 
 	/* increment sequence number, before passing on to upper layer */
 	++sess->record_seq_read;
@@ -1772,20 +1770,39 @@ static int session_record_decode(struct tls_session *sess,
 	/* Pass the Record on to upper layers */
 	handle_cleartext_record(sess, rec, mb);
 
-	/* update stop position after decrypting the record */
-	stop = start + tls_record_hdrsize(rec->proto_ver) + rec->length;
+	assert(mb->pos <= mb->size);
+	assert(mb->end <= mb->size);
 
-	/* todo: check this stuff here.. */
-	if (mb->pos != stop) {
-		re_printf("adjust pos: %zu -> %zu\n", mb->pos, stop);
-		mbuf_set_pos(mb, stop);
+#if 1
+	if (mb->pos != mb->end) {
+		DEBUG_WARNING("handle_record: did not care about all"
+			      " bytes (pos=%zu, end=%zu)\n", mb->pos, mb->end);
 	}
+#endif
+
+	/* update stop position after decrypting the record */
+	//stop = start + tls_record_hdrsize(rec->proto_ver) + rec->length;
 
  out:
+	return err;
+}
+
+
+static int session_record_decode(struct tls_session *sess, struct mbuf *mb)
+{
+	struct tls_record *rec = NULL;
+	int err;
+
+	err = tls_record_decode(&rec, mb);
 	if (err)
-		mem_deref(rec);
-	else
-		*recp = rec;
+		return err;
+
+	err = handle_record(sess, rec);
+	if (err)
+		goto out;
+
+ out:
+	mem_deref(rec);
 
 	return err;
 }
@@ -1895,22 +1912,19 @@ void tls_session_recvtcp(struct tls_session *sess, struct mbuf *mb)
 	}
 
 	for (;;) {
-		struct tls_record *rec = 0;
 
 		if (mbuf_get_left(sess->mb) < 5)
 			break;
 
 		pos = sess->mb->pos;
 
-		err = session_record_decode(sess, &rec, sess->mb);
+		err = session_record_decode(sess, sess->mb);
 		if (err) {
 			sess->mb->pos = pos;
 			if (err == ENODATA)
 				err = 0;
 			break;
 		}
-
-		mem_deref(rec);
 
 		if (sess->mb->pos >= sess->mb->end) {
 			sess->mb = mem_deref(sess->mb);
@@ -1929,7 +1943,6 @@ void tls_session_recvtcp(struct tls_session *sess, struct mbuf *mb)
 
 void tls_session_recvudp(struct tls_session *sess, struct mbuf *mb)
 {
-	struct tls_record *rec = NULL;
 	int err = 0;
 
 	if (!sess || !mb)
@@ -1939,11 +1952,9 @@ void tls_session_recvudp(struct tls_session *sess, struct mbuf *mb)
 
 	while (mbuf_get_left(mb) >= 5) {
 
-		err = session_record_decode(sess, &rec, mb);
+		err = session_record_decode(sess, mb);
 		if (err)
 			break;
-
-		rec = mem_deref(rec);
 
 		if (sess->closed)
 			break;

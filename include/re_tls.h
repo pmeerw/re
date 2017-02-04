@@ -377,10 +377,9 @@ void tls_handshake_dump(const struct tls_handshake *hand,
 /* record */
 
 int tls_record_encode(struct mbuf *mb, enum tls_version ver,
-		       enum tls_content_type type,
-		       uint16_t epoch, uint64_t seq,
-		       const uint8_t *frag, size_t fraglen);
-int tls_record_header_decode(struct tls_record **recp, struct mbuf *mb);
+		      enum tls_content_type type,
+		      uint16_t epoch, uint64_t seq,
+		      const uint8_t *frag, size_t fraglen);
 int tls_record_decode(struct tls_record **recp, struct mbuf *mb);
 size_t tls_record_hdrsize(enum tls_version ver);
 const char *tls_content_type_name(enum tls_content_type typ);

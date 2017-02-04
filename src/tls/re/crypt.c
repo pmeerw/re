@@ -51,16 +51,24 @@ int tls_crypt_encrypt(const struct key *write_key,
 	if (padding)
 		err = mbuf_fill(data, padding, padding);
 	err |= mbuf_write_u8(data, padding);
+
 	err |= mbuf_write_mem(mb_enc, iv, sizeof(iv));
 	if (err)
 		goto out;
+
+	if (mbuf_get_space(mb_enc) < data->end) {
+		size_t sz = sizeof(iv) + data->end;
+		err = mbuf_resize(mb_enc, sz);
+		if (err)
+			goto out;
+	}
 
 	err = aes_encr(aes, mbuf_buf(mb_enc), data->buf, data->end);
 	if (err)
 		goto out;
 
-	mb_enc->pos = sizeof iv + data->end;
-	mb_enc->end = sizeof iv + data->end;
+	mbuf_set_end(mb_enc, sizeof(iv) + data->end);
+	mbuf_set_pos(mb_enc, sizeof(iv) + data->end);
 
  out:
 	mem_deref(aes);

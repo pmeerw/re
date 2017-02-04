@@ -15,7 +15,7 @@
 #include "tls.h"
 
 
-#define DEBUG_MODULE "dtls"
+#define DEBUG_MODULE "tls"
 #define DEBUG_LEVEL 5
 #include <re_dbg.h>
 
@@ -28,7 +28,8 @@
 static void record_destructor(void *data)
 {
 	struct tls_record *rec = data;
-	(void)rec;
+
+	mem_deref(rec->fragment);
 }
 
 
@@ -64,7 +65,7 @@ int tls_record_encode(struct mbuf *mb, enum tls_version ver,
 
 
 /* returns ENODATA if record is not complete */
-int tls_record_header_decode(struct tls_record **recp, struct mbuf *mb)
+int tls_record_decode(struct tls_record **recp, struct mbuf *mb)
 {
 	struct tls_record *rec;
 	int err = 0;
@@ -101,43 +102,31 @@ int tls_record_header_decode(struct tls_record **recp, struct mbuf *mb)
 	}
 
 	rec->length        = ntohs(mbuf_read_u16(mb));
-	rec->fragment      = mbuf_buf(mb);
 
-	if (mbuf_get_left(mb) < rec->length) {
-		err = ENODATA;
+	if (rec->length > TLS_RECORD_FRAGMENT_SIZE) {
+		DEBUG_WARNING("record_decode: length too long (%u)"
+			      " [type=%d, ver=%d, mbuf=%zu:%zu:%zu]\n",
+			      rec->length,
+			      rec->content_type, rec->proto_ver,
+			      mb->pos, mb->end, mb->size);
+		err = EBADMSG;
 		goto out;
 	}
-
-	if (rec->length > 16384) {
-		err = EBADMSG;
-	}
-
- out:
-	if (err)
-		mem_deref(rec);
-	else
-		*recp = rec;
-
-	return err;
-}
-
-
-int tls_record_decode(struct tls_record **recp, struct mbuf *mb)
-{
-	struct tls_record *rec;
-	int err = 0;
-
-	if (!recp || !mb)
-		return EINVAL;
-
-	err = tls_record_header_decode(&rec, mb);
-	if (err)
-		return err;
-
 	if (rec->length > mbuf_get_left(mb)) {
 		err = ENODATA;
 		goto out;
 	}
+
+	/* NOTE: we copy the buffer to be safe. optimize later. */
+	rec->fragment = mem_alloc(rec->length, NULL);
+	if (!rec->fragment) {
+		err = ENOMEM;
+		goto out;
+	}
+
+	err = mbuf_read_mem(mb, rec->fragment, rec->length);
+	if (err)
+		goto out;
 
  out:
 	if (err)

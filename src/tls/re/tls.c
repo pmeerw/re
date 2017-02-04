@@ -68,6 +68,7 @@ int tls_alloc(struct tls **tlsp, enum tls_method method, const char *keyfile,
 {
 	struct tls *tls;
 	int err;
+	(void)pwd;
 
 	if (!tlsp)
 		return EINVAL;
@@ -344,11 +345,12 @@ int tls_srtp_keyinfo(const struct tls_conn *tc, enum srtp_suite *suite,
 	static const uint8_t label[LABEL_LEN] = "EXTRACTOR-dtls_srtp";
 	struct tls_secparam *secparam;
 	struct tls_extension *extl, *extr;
-	size_t key_size, salt_size;
+	size_t key_size, salt_size, size;
 	uint16_t common_profile = 0;
 	uint8_t output[2 * 30];
 	uint8_t seed[TLS_CLIENT_RANDOM_LEN + TLS_SERVER_RANDOM_LEN];
 	uint8_t *sp = seed, *p;
+	bool write = true; // XXX read or write ?
 	size_t i, j;
 	int err;
 
@@ -408,7 +410,10 @@ int tls_srtp_keyinfo(const struct tls_conn *tc, enum srtp_suite *suite,
 		return ENOSYS;
 	}
 
-	bool write = true; // XXX read or write ?
+	size = key_size + salt_size;
+
+	if (cli_key_size < size || srv_key_size < size)
+		return EOVERFLOW;
 
 	secparam = tls_session_secparam(tc->ssl, write);
 

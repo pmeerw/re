@@ -42,6 +42,10 @@ static void destructor(void *arg)
 {
 	struct tls_conn *tc = arg;
 
+#if 0
+	tls_session_dump(tc->ssl);
+#endif
+
 	if (tc->ssl) {
 		tls_session_shutdown(tc->ssl);
 		mem_deref(tc->ssl);

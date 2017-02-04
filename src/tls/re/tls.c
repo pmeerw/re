@@ -350,7 +350,7 @@ int tls_srtp_keyinfo(const struct tls_conn *tc, enum srtp_suite *suite,
 	uint8_t output[2 * 30];
 	uint8_t seed[TLS_CLIENT_RANDOM_LEN + TLS_SERVER_RANDOM_LEN];
 	uint8_t *sp = seed, *p;
-	bool write = true; // XXX read or write ?
+	bool write = false;
 	size_t i, j;
 	int err;
 

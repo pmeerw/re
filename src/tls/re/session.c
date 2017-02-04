@@ -776,6 +776,17 @@ static int send_clientkeyexchange(struct tls_session *sess)
 
 #if 1
 	/* XXX: this can be moved elsewhere ? */
+
+	err = tls_master_secret_compute(sess->sp_read.master_secret,
+					sess->pre_master_secret,
+					sizeof(sess->pre_master_secret),
+					sess->sp_read.client_random,
+					sess->sp_read.server_random);
+	if (err) {
+		DEBUG_WARNING("master_secret_compute error (%m)\n", err);
+		goto out;
+	}
+
 	err = tls_master_secret_compute(sess->sp_write.master_secret,
 					sess->pre_master_secret,
 					sizeof(sess->pre_master_secret),
@@ -1928,7 +1939,7 @@ void tls_session_recvudp(struct tls_session *sess, struct mbuf *mb)
 
 
 struct tls_secparam *tls_session_secparam(struct tls_session *sess,
-						 bool write)
+					  bool write)
 {
 	if (!sess)
 		return NULL;

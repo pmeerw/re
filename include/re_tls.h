@@ -479,7 +479,7 @@ int  tls_session_alloc(struct tls_session **sessp, struct tls *tls,
 		       tls_sess_close_h *closeh, void *arg);
 int  tls_session_start(struct tls_session *sess);
 struct tls_secparam *tls_session_secparam(struct tls_session *sess,
-						 bool write);
+					  bool write);
 int  tls_session_send_data(struct tls_session *sess,
 			    const uint8_t *data, size_t data_len);
 void tls_session_recvtcp(struct tls_session *sess, struct mbuf *mb);

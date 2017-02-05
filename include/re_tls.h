@@ -164,11 +164,9 @@ enum tls_cipher {
 };
 
 enum tls_mac_algorithm {
-	TLS_MAC_NULL=0,
+	TLS_MAC_NULL = 0,
 	TLS_MAC_HMAC_SHA1,
 	TLS_MAC_HMAC_SHA256,
-	/*TLS_MAC_HMAC_SHA384,*/
-	/*TLS_MAC_HMAC_SHA512*/
 };
 
 enum tls_compression_method {

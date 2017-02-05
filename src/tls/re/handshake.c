@@ -17,7 +17,7 @@
 #include "tls.h"
 
 
-#define DEBUG_MODULE "dtls"
+#define DEBUG_MODULE "tls"
 #define DEBUG_LEVEL 5
 #include <re_dbg.h>
 

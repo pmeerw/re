@@ -523,15 +523,6 @@ bool        tls_version_is_dtls(enum tls_version ver);
 const char *tls_version_name(enum tls_version ver);
 
 
-/* crypt */
-
-int tls_crypt_encrypt(const struct key *write_key,
-		      struct mbuf *mb_enc, struct mbuf *data);
-int tls_crypt_decrypt(const struct key *write_key,
-		      struct mbuf *mb, size_t rec_length,
-		      uint8_t *paddingp);
-
-
 /* finish */
 
 int tls_finish_calc(uint8_t verify_data[TLS_VERIFY_DATA_SIZE],

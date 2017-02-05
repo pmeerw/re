@@ -1,5 +1,5 @@
 /**
- * @file tls.h  Internal API
+ * @file re/tls.h  TLS backend using libre (Internal API)
  *
  * Copyright (C) 2010 - 2016 Creytiv.com
  */
@@ -14,6 +14,15 @@ struct tls {
 
 	struct list exts_local;  /* Local extensions */
 };
+
+
+/* crypt */
+
+int tls_crypt_encrypt(const struct key *write_key,
+		      struct mbuf *mb_enc, struct mbuf *data);
+int tls_crypt_decrypt(const struct key *write_key,
+		      struct mbuf *mb, size_t rec_length,
+		      uint8_t *paddingp);
 
 
 /* hmac */

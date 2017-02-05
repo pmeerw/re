@@ -9,15 +9,17 @@
 #include <re_fmt.h>
 #include <re_mem.h>
 #include <re_mbuf.h>
+#include <re_list.h>
 #include <re_sys.h>
 #include <re_cert.h>
 #include <re_sha.h>
 #include <re_aes.h>
 #include <re_srtp.h>
 #include <re_tls.h>
+#include "tls.h"
 
 
-#define DEBUG_MODULE "dtls"
+#define DEBUG_MODULE "tls"
 #define DEBUG_LEVEL 5
 #include <re_dbg.h>
 

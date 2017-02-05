@@ -212,7 +212,7 @@ int tls_extensions_decode(struct list *extl,
 			break;
 
 		default:
-			DEBUG_NOTICE("dont know how to decode"
+			DEBUG_INFO("ext: dont know how to decode"
 				     " extension %d (%s)\n",
 				     type,
 				     tls_extension_name(type));

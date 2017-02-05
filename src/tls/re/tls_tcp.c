@@ -23,6 +23,9 @@
 #include <re_dbg.h>
 
 
+#define TRACE 0
+
+
 /* NOTE: shadow struct defined in tls_*.c */
 struct tls_conn {
 	struct tls_session *ssl;  /* inheritance */
@@ -90,6 +93,34 @@ static void dtls_sess_close_handler(int err, void *arg)
 }
 
 
+static int resolve_color(enum tls_trace_flags flag)
+{
+	switch (flag) {
+
+	case TLS_TRACE_RECORD:             return 37;  /* white   */
+	case TLS_TRACE_CHANGE_CIPHER_SPEC: return 35;  /* magenta */
+	case TLS_TRACE_ALERT:              return 31;  /* red     */
+	case TLS_TRACE_HANDSHAKE:          return 34;  /* blue    */
+	case TLS_TRACE_APPLICATION_DATA:   return 33;  /* yellow  */
+	default:                           return 37;
+	}
+}
+
+
+static void tls_trace_handler(enum tls_trace_flags flag, const char *msg,
+			       void *arg)
+{
+	struct tls_conn *tc = arg;
+
+	re_printf("[" "\x1b[%dm" "%-18s" "\x1b[;m" "]" " %s:" " " "%s"
+		  ,
+		  resolve_color(flag),
+		  tls_trace_name(flag),
+		  tc->active ? "Client" : "Server",
+		  msg);
+}
+
+
 static int tls_connect(struct tls_conn *tc)
 {
 	struct tls *tls = tc->tls;
@@ -107,6 +138,11 @@ static int tls_connect(struct tls_conn *tc)
 					 dtls_sess_close_handler, tc);
 		if (err)
 			return err;
+
+		if (TRACE) {
+			tls_set_trace(tc->ssl, TLS_TRACE_ALL,
+				      tls_trace_handler);
+		}
 
 		if (tc->tls->cert)
 			tls_session_set_certificate2(tc->ssl, tc->tls->cert);
@@ -135,6 +171,11 @@ static int tls_accept(struct tls_conn *tc)
 					 dtls_sess_close_handler, tc);
 		if (err)
 			return err;
+
+		if (TRACE) {
+			tls_set_trace(tc->ssl, TLS_TRACE_ALL,
+				      tls_trace_handler);
+		}
 
 		if (tc->tls->cert)
 			tls_session_set_certificate2(tc->ssl, tc->tls->cert);

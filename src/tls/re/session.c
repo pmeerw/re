@@ -529,7 +529,8 @@ static int send_serverhello(struct tls_session *sess)
 	hello->compression_method = TLS_COMPRESSION_NULL;
 
 	/* Local extensions */
-	// XXX: intersect with remote
+
+	/* XXX: intersect local and remote extensions */
 	if (sess->tls && !list_isempty(&sess->tls->exts_local)) {
 
 		err = tls_extensions_encode(&hello->extensions,
@@ -1435,18 +1436,32 @@ static void process_handshake(struct tls_session *sess,
  *
  */
 static int record_decrypt_aes_and_unmac(struct tls_session *sess,
-				 struct tls_record *rec,
-				 struct mbuf *mb)
+					struct tls_record *rec)
 {
 	const struct key *write_key, *write_MAC_key;
 	uint8_t mac_pkt[MAX_MAC_SIZE], mac_gen[MAX_MAC_SIZE], padding;
-	size_t start, pos_content, pos_mac, mac_sz, content_len;
+	size_t start;
+	size_t pos_content;
+	size_t pos_mac;
+	size_t mac_sz;
+	size_t content_len;
 	int err = 0;
+	struct mbuf mbf;
 
-	if (!sess || !rec || mbuf_get_left(mb) < (IV_SIZE+20))
+	if (!sess || !rec)
 		return EINVAL;
 
-	start       = mb->pos;
+	if (rec->length < (IV_SIZE+20)) {
+		DEBUG_WARNING("record too short\n");
+		return EBADMSG;
+	}
+
+	mbf.buf  = rec->fragment;
+	mbf.size = rec->length;
+	mbf.pos  = 0;
+	mbf.end  = rec->length;
+
+	start       = 0;
 	pos_content = start + IV_SIZE;
 	mac_sz      = sess->sp_read.mac_length;
 
@@ -1457,7 +1472,9 @@ static int record_decrypt_aes_and_unmac(struct tls_session *sess,
 	else
 		return EINVAL;
 
-	err = tls_crypt_decrypt(write_key, mb, rec->length, &padding);
+	err = tls_crypt_decrypt(write_key, &mbf, rec->length, &padding);
+	assert(mbf.pos <= mbf.size);
+	assert(mbf.end <= mbf.size);
 	if (err) {
 		DEBUG_WARNING("crypt_decrypt error (%m)\n", err);
 		return err;
@@ -1466,8 +1483,8 @@ static int record_decrypt_aes_and_unmac(struct tls_session *sess,
 	pos_mac     = start + rec->length - mac_sz - padding - 1;
 	content_len = rec->length - IV_SIZE - mac_sz - padding - 1;
 
-	mb->pos = pos_mac;
-	err = mbuf_read_mem(mb, mac_pkt, mac_sz);
+	mbf.pos = pos_mac;
+	err = mbuf_read_mem(&mbf, mac_pkt, mac_sz);
 	if (err)
 		return err;
 
@@ -1481,7 +1498,7 @@ static int record_decrypt_aes_and_unmac(struct tls_session *sess,
 	err = tls_mac_generate(mac_gen, mac_sz, write_MAC_key,
 			       record_get_read_seqnum(sess), rec->content_type,
 			       rec->proto_ver, content_len,
-			       &mb->buf[pos_content]);
+			       &mbf.buf[pos_content]);
 	if (err)
 		return err;
 
@@ -1500,14 +1517,19 @@ static int record_decrypt_aes_and_unmac(struct tls_session *sess,
 		return EBADMSG;
 	}
 
-	/* update mbuf */
-	mb->pos = pos_content;
-	mb->end = pos_content + content_len;
+#if 1
+	/* strip away the leading IV in the front */
+	memmove(rec->fragment, rec->fragment + IV_SIZE, content_len);
+#else
+	uint8_t *clear;
 
-	// TODO: does this work if there are more records coming in this mbuf?
-	err = mbuf_shift(mb, -IV_SIZE);
-	if (err)
-		return err;
+	clear = mem_zalloc(content_len, NULL);
+
+	mem_cpy(clear, content_len, &rec->fragment[pos_content], content_len);
+
+	mem_deref(rec->fragment);
+	rec->fragment = clear;
+#endif
 
 	/* update record header with length of clear-text record */
 	rec->length = content_len;
@@ -1517,8 +1539,7 @@ static int record_decrypt_aes_and_unmac(struct tls_session *sess,
 
 
 static int handle_handshake_fragment(struct tls_session *sess,
-				     const struct tls_record *rec,
-				     struct mbuf *mb)
+				     const struct tls_record *rec)
 {
 	enum tls_version ver = rec->proto_ver;
 	size_t pos;
@@ -1540,8 +1561,6 @@ static int handle_handshake_fragment(struct tls_session *sess,
 	err = mbuf_write_mem(sess->hand_mb, rec->fragment, rec->length);
 	if (err)
 		return err;
-
-	mb->pos += rec->length;
 
 	sess->hand_mb->pos = pos;
 
@@ -1577,7 +1596,7 @@ static int handle_handshake_fragment(struct tls_session *sess,
 
 		mem_deref(handshake);
 
-		// todo: the handler might deref session
+		/* todo: the handler might deref session */
 		if (sess->hand_mb->pos >= sess->hand_mb->end) {
 			sess->hand_mb = mem_deref(sess->hand_mb);
 			stop = true;
@@ -1595,9 +1614,10 @@ static int handle_handshake_fragment(struct tls_session *sess,
 
 /* This is the place for de-multiplexing incoming Records */
 static void handle_cleartext_record(struct tls_session *sess,
-				    const struct tls_record *rec,
-				    struct mbuf *mb)
+				    const struct tls_record *rec)
 {
+	struct mbuf mb_wrap = {rec->fragment, rec->length, 0, rec->length};
+	struct mbuf *mb = &mb_wrap;
 	int err = 0;
 
 	if (sess->closed)
@@ -1647,11 +1667,10 @@ static void handle_cleartext_record(struct tls_session *sess,
 		break;
 
 	case TLS_HANDSHAKE:
-		err = handle_handshake_fragment(sess, rec, mb);
+		err = handle_handshake_fragment(sess, rec);
 		break;
 
 	case TLS_APPLICATION_DATA:
-		mbuf_advance(mb, rec->length);
 
 		tls_trace(sess, TLS_TRACE_APPLICATION_DATA,
 			   "receive %zu bytes\n", rec->length);
@@ -1704,13 +1723,7 @@ static int print_record_prefix(struct re_printf *pf,
 
 static int handle_record(struct tls_session *sess, struct tls_record *rec)
 {
-	struct mbuf mb_wrap, *mb = &mb_wrap;
-	int err;
-
-	mb_wrap.buf = rec->fragment;
-	mb_wrap.pos = 0;
-	mb_wrap.end = rec->length;
-	mb_wrap.size = rec->length;
+	int err = 0;
 
 	tls_trace(sess, TLS_TRACE_RECORD,
 		  "%Hdecode type '%s' fragment_length=%u\n",
@@ -1729,7 +1742,6 @@ static int handle_record(struct tls_session *sess, struct tls_record *rec)
 			DEBUG_INFO("discard message: epoch_seq=%u.%llu\n",
 				   rec->epoch, rec->seq);
 
-			//mb->pos = stop;
 			return 0;
 		}
 	}
@@ -1738,15 +1750,12 @@ static int handle_record(struct tls_session *sess, struct tls_record *rec)
 
 	case TLS_BULKCIPHER_NULL:
 		rec->length -= sess->sp_read.mac_length;
-		mb->end -= sess->sp_read.mac_length;
 		break;
 
 	case TLS_BULKCIPHER_AES:
-		err = record_decrypt_aes_and_unmac(sess, rec, mb);
+		err = record_decrypt_aes_and_unmac(sess, rec);
 		if (err)
 			return err;
-		assert(mb->pos <= mb->size);
-		assert(mb->end <= mb->size);
 		break;
 
 	default:
@@ -1762,26 +1771,11 @@ static int handle_record(struct tls_session *sess, struct tls_record *rec)
 		goto out;
 	}
 
-	mb->pos = 0;
-
 	/* increment sequence number, before passing on to upper layer */
 	++sess->record_seq_read;
 
 	/* Pass the Record on to upper layers */
-	handle_cleartext_record(sess, rec, mb);
-
-	assert(mb->pos <= mb->size);
-	assert(mb->end <= mb->size);
-
-#if 1
-	if (mb->pos != mb->end) {
-		DEBUG_WARNING("handle_record: did not care about all"
-			      " bytes (pos=%zu, end=%zu)\n", mb->pos, mb->end);
-	}
-#endif
-
-	/* update stop position after decrypting the record */
-	//stop = start + tls_record_hdrsize(rec->proto_ver) + rec->length;
+	handle_cleartext_record(sess, rec);
 
  out:
 	return err;
@@ -1881,22 +1875,23 @@ int tls_session_send_data(struct tls_session *sess,
 }
 
 
-void tls_session_recvtcp(struct tls_session *sess, struct mbuf *mb)
+void tls_session_recvtcp(struct tls_session *sess, struct mbuf *mbx)
 {
 	size_t pos;
 	int err = 0;
 
-	if (!sess || !mb)
+	if (!sess || !mbx)
 		return;
 
-	sess->record_bytes_read += mbuf_get_left(mb);
+	sess->record_bytes_read += mbuf_get_left(mbx);
 
 	if (sess->mb) {
 		pos = sess->mb->pos;
 
 		sess->mb->pos = sess->mb->end;
 
-		err = mbuf_write_mem(sess->mb, mbuf_buf(mb),mbuf_get_left(mb));
+		err = mbuf_write_mem(sess->mb,
+				     mbuf_buf(mbx),mbuf_get_left(mbx));
 		if (err)
 			goto out;
 
@@ -1908,8 +1903,21 @@ void tls_session_recvtcp(struct tls_session *sess, struct mbuf *mb)
 		}
 	}
 	else {
-		sess->mb = mem_ref(mb);
+		sess->mb = mbuf_alloc(mbuf_get_left(mbx));
+		if (!sess->mb) {
+			err = ENOMEM;
+			goto out;
+		}
+
+		err = mbuf_write_mem(sess->mb,
+				     mbuf_buf(mbx),mbuf_get_left(mbx));
+		if (err)
+			goto out;
+
+		sess->mb->pos = 0;
 	}
+
+	mbx = NULL;  /* unused after this */
 
 	for (;;) {
 
@@ -2133,6 +2141,8 @@ bool tls_session_is_estab(const struct tls_session *sess)
 
 void tls_session_shutdown(struct tls_session *sess)
 {
+	DEBUG_INFO("shutdown\n");
+
 	if (!sess || sess->closed)
 		return;
 
@@ -2145,4 +2155,28 @@ void tls_session_shutdown(struct tls_session *sess)
 const struct list *tls_session_remote_exts(const struct tls_session *sess)
 {
 	return sess ? &sess->exts_remote : NULL;
+}
+
+
+int tls_session_get_servername(struct tls_session *sess,
+			       char *servername, size_t sz)
+{
+	struct tls_extension *ext;
+
+	if (!sess || !servername || !sz)
+		return EINVAL;
+
+	ext = tls_extension_find(tls_session_remote_exts(sess),
+				 TLS_EXT_SERVER_NAME);
+	if (!ext) {
+		DEBUG_WARNING("remote server_name is missing\n");
+		return ENOENT;
+	}
+
+	if (ext->v.server_name.type != 0)
+		return ENOTSUP;
+
+	str_ncpy(servername, ext->v.server_name.host, sz);
+
+	return 0;
 }

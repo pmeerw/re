@@ -240,7 +240,7 @@ int tls_set_srtp(struct tls *tls, const char *suites)
 	}
 
 	ext->v.use_srtp.profilec = i;
-	re_printf("added %zu profiles\n", i);
+
  out:
 	return err;
 }
@@ -374,8 +374,6 @@ int tls_srtp_keyinfo(const struct tls_conn *tc, enum srtp_suite *suite,
 	for (i=0; i<extr->v.use_srtp.profilec && !common_profile; i++) {
 
 		uint16_t rprofile = extr->v.use_srtp.profilev[i];
-
-		re_printf("    remote_profile: 0x%04x\n", rprofile);
 
 		for (j=0; j<extl->v.use_srtp.profilec; j++) {
 

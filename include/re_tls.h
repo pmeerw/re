@@ -494,6 +494,8 @@ int tls_session_set_fragment_size(struct tls_session *sess, size_t size);
 struct cert *tls_session_peer_certificate(const struct tls_session *sess);
 bool tls_session_is_estab(const struct tls_session *sess);
 void tls_session_shutdown(struct tls_session *sess);
+int tls_session_get_servername(struct tls_session *sess,
+			       char *servername, size_t sz);
 
 
 /* master secret */

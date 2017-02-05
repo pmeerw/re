@@ -101,7 +101,10 @@ ifneq (,$(findstring gcc, $(CC_LONGVER)))
 			 sed -e 's/2\.9.*/2.9x/' -e 's/3\.[0-3]\..*/3.0/' -e \
 			 	's/3\.[0-3]/3.0/' -e 's/3\.[4-9]\..*/3.4/' -e\
 				's/3\.[4-9]/3.4/' -e 's/4\.[0-9]\..*/4.x/' -e\
-				's/4\.[0-9]/4.x/' )
+				's/4\.[0-9]/4.x/' \
+				-e 's/5\.[0-9]..*/5.x/' \
+				-e 's/6\.[0-9]..*/6.x/' \
+			)
 endif
 
 ifeq ($(CC_NAME),)
@@ -675,7 +678,8 @@ info:
 	@echo "  OS:            $(OS)"
 	@echo "  BUILD:         $(BUILD)"
 	@echo "  CCACHE:        $(CCACHE)"
-	@echo "  CC:            $(CC_NAME) $(CC_SHORTVER)"
+	@echo "  CC:            $(CC_NAME)"
+	@echo "  CC_SHORTVER:   $(CC_SHORTVER)"
 	@echo "  CFLAGS:        $(CFLAGS)"
 	@echo "  DFLAGS:        $(DFLAGS)"
 	@echo "  LFLAGS:        $(LFLAGS)"

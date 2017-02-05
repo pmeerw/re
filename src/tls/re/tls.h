@@ -103,3 +103,10 @@ struct tls_extension *tls_extensions_apply(const struct list *extl,
  */
 
 const struct list *tls_session_remote_exts(const struct tls_session *sess);
+
+
+/*
+ * version
+ */
+
+bool tls_version_isvalid(enum tls_version ver);

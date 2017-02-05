@@ -85,6 +85,13 @@ int tls_record_decode(struct tls_record **recp, struct mbuf *mb)
 	rec->content_type  = mbuf_read_u8(mb);
 	rec->proto_ver     = ntohs(mbuf_read_u16(mb));
 
+	if (!tls_version_isvalid(rec->proto_ver)) {
+		DEBUG_WARNING("record_decode: protocol version"
+			      " is not valid (0x%04x)\n", rec->proto_ver);
+		err = EBADMSG;
+		goto out;
+	}
+
 	if (tls_version_is_dtls(rec->proto_ver)) {
 
 		if (mbuf_get_left(mb) < 8) {

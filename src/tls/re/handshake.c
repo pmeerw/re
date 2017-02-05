@@ -22,6 +22,9 @@
 #include <re_dbg.h>
 
 
+#define HANDSHAKE_LENGTH_MAX  65536u
+
+
 static void handshake_destructor(void *data)
 {
 	struct tls_handshake *hand = data;
@@ -406,6 +409,13 @@ int tls_handshake_decode(struct tls_handshake **handp,
 	}
 	hand->msg_type = mbuf_read_u8(mb);
 	hand->length   = mbuf_read_u24_ntoh(mb);
+
+	if (hand->length > HANDSHAKE_LENGTH_MAX) {
+		DEBUG_WARNING("handshake_decode: very long length"
+			      " (%llu > %zu bytes)\n",
+			      hand->length,
+			      (size_t)HANDSHAKE_LENGTH_MAX);
+	}
 
 	if (ver == DTLS1_2_VERSION) {
 		if (mbuf_get_left(mb) < 8) {

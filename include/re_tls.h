@@ -103,6 +103,13 @@ const struct sa *dtls_peer(const struct tls_conn *tc);
 void dtls_set_peer(struct tls_conn *tc, const struct sa *peer);
 
 
+#ifdef USE_OPENSSL
+struct ssl_ctx_st;
+
+struct ssl_ctx_st *tls_openssl_context(const struct tls *tls);
+#endif
+
+
 #ifndef USE_OPENSSL_TLS
 
 /*

@@ -242,6 +242,16 @@ ifeq ($(OS),linux)
 	AR		:= ar
 	AFLAGS		:= cru
 endif
+ifeq ($(OS),gnu)
+	CFLAGS		+= -fPIC -DGNU
+	LIBS		+= -ldl
+	LFLAGS		+= -fPIC
+	SH_LFLAGS	+= -shared
+	MOD_LFLAGS	+=
+	APP_LFLAGS	+= -rdynamic
+	AR		:= ar
+	AFLAGS		:= cru
+endif
 ifeq ($(OS),darwin)
 	CFLAGS		+= -fPIC -dynamic -DDARWIN
 ifneq (,$(findstring Apple, $(CC_LONGVER)))
@@ -277,6 +287,16 @@ ifeq ($(OS),netbsd)
 endif
 ifeq ($(OS),freebsd)
 	CFLAGS		+= -fPIC -DFREEBSD
+	LFLAGS		+= -fPIC
+	SH_LFLAGS	+= -shared
+	MOD_LFLAGS	+=
+	APP_LFLAGS	+= -rdynamic
+	AR		:= ar
+	AFLAGS		:= cru
+	HAVE_KQUEUE	:= 1
+endif
+ifeq ($(OS),gnu/kfreebsd)
+	CFLAGS		+= -fPIC -DKFREEBSD -D_GNU_SOURCE
 	LFLAGS		+= -fPIC
 	SH_LFLAGS	+= -shared
 	MOD_LFLAGS	+=

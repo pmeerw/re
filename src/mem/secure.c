@@ -38,3 +38,13 @@ int secure_compare(const volatile uint8_t *volatile s1,
 
 	return val;
 }
+
+
+void secure_memclear(volatile uint8_t *volatile p, size_t n)
+{
+	if (!p || !n)
+		return;
+
+	while (n--)
+		*p++ = 0;
+}

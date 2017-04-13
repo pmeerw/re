@@ -46,3 +46,4 @@ void     mem_print(const void *data);
 int secure_compare(const volatile uint8_t *volatile s1,
 		   const volatile uint8_t *volatile s2,
 		   size_t n);
+void secure_memclear(volatile uint8_t *volatile p, size_t n);

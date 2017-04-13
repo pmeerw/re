@@ -626,6 +626,11 @@ static void destructor(void *data)
 	mem_deref(sess->cert_remote);
 	mem_deref(sess->cipherv);
 	list_flush(&sess->exts_remote);
+
+	secure_memclear(sess->sp_write.master_secret,
+			sizeof(sess->sp_write.master_secret));
+	secure_memclear(sess->sp_read.master_secret,
+			sizeof(sess->sp_read.master_secret));
 }
 
 

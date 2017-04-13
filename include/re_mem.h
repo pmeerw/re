@@ -41,3 +41,8 @@ int      mem_get_stat(struct memstat *mstat);
 
 bool     mem_is_valid(const void *data);
 void     mem_print(const void *data);
+
+
+int secure_compare(const volatile uint8_t *volatile s1,
+		   const volatile uint8_t *volatile s2,
+		   size_t n);

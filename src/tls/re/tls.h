@@ -180,6 +180,17 @@ struct tls_session {
 };
 
 const struct list *tls_session_remote_exts(const struct tls_session *sess);
+bool tls_cipher_suite_lookup(const struct tls_session *sess,
+			     enum tls_cipher_suite cs);
+
+int tls_client_send_clienthello(struct tls_session *sess);
+int tls_client_handle_server_hello(struct tls_session *sess,
+				   const struct serverhello *hell);
+
+int tls_handshake_layer_send(struct tls_session *sess,
+				enum tls_handshake_type msg_type,
+				const union handshake *hand,
+			     bool flush_now, bool crypt);
 
 
 /*

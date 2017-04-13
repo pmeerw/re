@@ -12,6 +12,7 @@ else
 
 SRCS	+= tls/re/alert.c
 SRCS	+= tls/re/cipher.c
+SRCS	+= tls/re/client.c
 SRCS	+= tls/re/crypt.c
 SRCS	+= tls/re/extension.c
 SRCS	+= tls/re/finish.c

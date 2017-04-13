@@ -60,7 +60,7 @@ static int handle_change_cipher_spec(struct tls_session *sess);
  */
 
 
-static int handshake_layer_send(struct tls_session *sess,
+int tls_handshake_layer_send(struct tls_session *sess,
 				enum tls_handshake_type msg_type,
 				const union handshake *hand,
 				bool flush_now, bool crypt)
@@ -295,8 +295,8 @@ static uint64_t record_get_write_seqnum(const struct tls_session *sess)
  */
 
 
-static bool cipher_suite_lookup(const struct tls_session *sess,
-				enum tls_cipher_suite cs)
+bool tls_cipher_suite_lookup(const struct tls_session *sess,
+			     enum tls_cipher_suite cs)
 {
 	size_t i;
 
@@ -373,66 +373,6 @@ static void conn_close(struct tls_session *sess, int err)
 }
 
 
-static int send_clienthello(struct tls_session *sess)
-{
-	union handshake hand;
-	struct clienthello *hello = &hand.clienthello;
-	enum tls_compression_method compr_methods[1] = {
-		TLS_COMPRESSION_NULL
-	};
-	uint16_t *datav = NULL;
-	size_t i;
-	int err;
-
-	datav = mem_alloc(sess->cipherc * sizeof(uint16_t), NULL);
-
-	memset(&hand, 0, sizeof(hand));
-
-	hello->client_version = sess->version;
-
-	mem_cpy(hello->random, sizeof(hello->random),
-		sess->sp_write.client_random,
-		sizeof(sess->sp_write.client_random));
-
-	/* Optional cookie for DTLS */
-	if (sess->hand_cookie_len) {
-		hello->cookie.data = sess->hand_cookie;
-		hello->cookie.bytes = sess->hand_cookie_len;
-	}
-
-	for (i=0; i<sess->cipherc; i++) {
-		datav[i] = htons(sess->cipherv[i]);
-	}
-
-	hello->cipher_suites.bytes = 2 * sess->cipherc;
-	hello->cipher_suites.data = datav;
-
-	hello->compression_methods.bytes = 1;
-	hello->compression_methods.data = compr_methods;
-
-	/* Local extensions */
-	if (sess->tls && !list_isempty(&sess->tls->exts_local)) {
-
-		err = tls_extensions_encode(&hello->extensions,
-					    &sess->tls->exts_local);
-		if (err) {
-			DEBUG_WARNING("ext encode error (%m)\n", err);
-			goto out;
-		}
-	}
-
-	err = handshake_layer_send(sess, TLS_CLIENT_HELLO, &hand,
-				   true, false);
-	if (err)
-		goto out;
-
- out:
-	tls_vector_reset(&hello->extensions);
-	mem_deref(datav);
-	return err;
-}
-
-
 static int send_serverhello(struct tls_session *sess)
 {
 	union handshake hand;
@@ -466,7 +406,7 @@ static int send_serverhello(struct tls_session *sess)
 		}
 	}
 
-	err = handshake_layer_send(sess, TLS_SERVER_HELLO, &hand,
+	err = tls_handshake_layer_send(sess, TLS_SERVER_HELLO, &hand,
 				   false, false);
 	if (err)
 		goto out;
@@ -503,7 +443,7 @@ static int send_certificate(struct tls_session *sess)
 
 	cert->count = 1;
 
-	err = handshake_layer_send(sess, TLS_CERTIFICATE, &hand,
+	err = tls_handshake_layer_send(sess, TLS_CERTIFICATE, &hand,
 				   false, false);
 	if (err)
 		goto out;
@@ -520,7 +460,7 @@ static int send_serverhellodone(struct tls_session *sess)
 {
 	int err;
 
-	err = handshake_layer_send(sess, TLS_SERVER_HELLO_DONE, NULL,
+	err = tls_handshake_layer_send(sess, TLS_SERVER_HELLO_DONE, NULL,
 				   true, false);
 	if (err)
 		return err;
@@ -656,7 +596,7 @@ int tls_session_start(struct tls_session *sess)
 	if (!sess)
 		return EINVAL;
 
-	return send_clienthello(sess);
+	return tls_client_send_clienthello(sess);
 }
 
 
@@ -701,7 +641,7 @@ static int send_clientkeyexchange(struct tls_session *sess)
 	if (err)
 		goto out;
 
-	err = handshake_layer_send(sess, TLS_CLIENT_KEY_EXCHANGE,
+	err = tls_handshake_layer_send(sess, TLS_CLIENT_KEY_EXCHANGE,
 				   &hand.u, false, false);
 	if (err)
 		goto out;
@@ -873,7 +813,7 @@ static int send_finished(struct tls_session *sess)
 		}
 	}
 
-	err = handshake_layer_send(sess, TLS_FINISHED, &hand,
+	err = tls_handshake_layer_send(sess, TLS_FINISHED, &hand,
 				   true, true);
 	if (err) {
 		DEBUG_WARNING("finished: handshake_layer_send failed %m\n",
@@ -1042,52 +982,6 @@ out:
 }
 
 
-static int client_handle_server_hello(struct tls_session *sess,
-				      const struct serverhello *hell)
-{
-	int err = 0;
-
-	/* save the Server-random */
-	mem_cpy(sess->sp_read.server_random,
-		sizeof(sess->sp_read.server_random),
-		hell->random, sizeof(hell->random));
-	mem_cpy(sess->sp_write.server_random,
-		sizeof(sess->sp_write.server_random),
-		hell->random, sizeof(hell->random));
-
-	/* the cipher-suite is now decided */
-	if (!cipher_suite_lookup(sess, hell->cipher_suite)) {
-		DEBUG_WARNING("the server gave us a cipher-suite that"
-			      " we did not offer!\n");
-		return EPROTO;
-	}
-
-	sess->selected_cipher_suite = hell->cipher_suite;
-
-	sess->suite = tls_suite_lookup(sess->selected_cipher_suite);
-	if (!sess->suite) {
-		DEBUG_WARNING("cipher suite not found (%s)\n",
-			      tls_cipher_suite_name(hell->cipher_suite));
-		return EPROTO;
-	}
-
-	/* decode extensions from remote */
-	if (hell->extensions.bytes) {
-
-		err = tls_extensions_decode(&sess->exts_remote,
-					    &hell->extensions);
-		if (err) {
-			DEBUG_WARNING("server_hello: extension error"
-				      " (%m)\n", err);
-			goto out;
-		}
-	}
-
- out:
-	return err;
-}
-
-
 static int client_handle_server_hello_done(struct tls_session *sess)
 {
 	int err;
@@ -1137,7 +1031,7 @@ static int server_handle_client_hello(struct tls_session *sess,
 	for (i=0; i<n; i++) {
 		enum tls_cipher_suite cs = ntohs(suites[i]);
 
-		if (cipher_suite_lookup(sess, cs)) {
+		if (tls_cipher_suite_lookup(sess, cs)) {
 			sess->selected_cipher_suite = cs;
 			supported = true;
 			break;
@@ -1257,7 +1151,8 @@ static void process_handshake(struct tls_session *sess,
 		break;
 
 	case TLS_SERVER_HELLO:
-		err = client_handle_server_hello(sess, &hand->u.serverhello);
+		err = tls_client_handle_server_hello(sess,
+						     &hand->u.serverhello);
 		break;
 
 	case TLS_HELLO_VERIFY_REQUEST: {
@@ -1276,7 +1171,7 @@ static void process_handshake(struct tls_session *sess,
 		 */
 		SHA256_Init(&sess->hand_ctx);
 
-		err = send_clienthello(sess);
+		err = tls_client_send_clienthello(sess);
 	}
 		break;
 

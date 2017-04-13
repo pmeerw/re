@@ -1030,7 +1030,9 @@ static int verify_finished(struct tls_session *sess,
 	}
 
 	if (sizeof(verify_data) != sizeof(fin->verify_data) ||
-	    0 != memcmp(verify_data, fin->verify_data, sizeof(verify_data))) {
+	    0 != secure_compare(verify_data, fin->verify_data,
+				sizeof(verify_data))) {
+
 		DEBUG_WARNING("finished: verify_data mismatch\n");
 
 		re_printf("finished: packet = %w\n",
@@ -1502,7 +1504,7 @@ static int record_decrypt_aes_and_unmac(struct tls_session *sess,
 	if (err)
 		return err;
 
-	if (0 != memcmp(mac_gen, mac_pkt, mac_sz)) {
+	if (0 != secure_compare(mac_gen, mac_pkt, mac_sz)) {
 		DEBUG_WARNING("decrypt: *** MAC Mismatch!"
 			      " (record type '%s', length %u) ***"
 			      "\n",

@@ -35,83 +35,8 @@
 #define MAX_MAC_SIZE 32
 #define IV_SIZE 16
 #define TCP_BUFSIZE_MAX (1<<24)
-#define MAX_RSA_BYTES 512  /* 4096 bits */
 #define SEED_SIZE 32
-#define DTLS_COOKIE_LENGTH 256
 #define MBUF_HEADROOM 4
-
-
-/* XXX: split into client.c and server.c */
-struct tls_session {
-	const struct tls *tls;               /* pointer to parent context */
-
-	struct tls_secparam sp_write;
-	struct tls_secparam sp_read;
-
-	struct tls_key_block key_block;
-
-	enum tls_connection_end conn_end;
-	enum tls_version version;
-
-	enum tls_cipher_suite *cipherv;
-	size_t cipherc;
-
-	enum tls_cipher_suite selected_cipher_suite;
-
-	const struct tls_suite *suite;
-
-	uint8_t pre_master_secret[48];
-	uint8_t encr_pre_master_secret[MAX_RSA_BYTES];
-	size_t encr_pre_master_secret_len;
-
-	/* certificates (X509v3) */
-	struct cert *cert_local;
-	struct cert *cert_remote;
-
-	/* callback handlers */
-	tls_sess_send_h *sendh;
-	tls_data_recv_h *datarecvh;
-	tls_sess_estab_h *estabh;
-	tls_sess_close_h *closeh;
-	void *arg;
-
-	enum tls_trace_flags trace_flags;
-	tls_trace_h *traceh;
-
-	bool estab;
-	bool closed;
-	bool alert_sent;
-	bool got_ccs;
-
-	/*
-	 * PROTOCOL LAYERS BELOW:
-	 */
-
-	/* handshake layer: */
-	SHA256_CTX hand_ctx;          /* hash of Handshakes sent/received */
-	uint16_t hand_seq_write;
-	uint16_t hand_seq_read;
-	size_t hand_bytes_write;
-	size_t hand_bytes_read;
-	struct mbuf *hand_mb;         /* buffer incoming handshake fragments */
-
-	uint8_t hand_cookie[DTLS_COOKIE_LENGTH];    /* DTLS only */
-	size_t hand_cookie_len;
-
-	/* record layer: */
-	struct mbuf *mb_write;        /* buffer outgoing records */
-	struct mbuf *mb;              /* buffer for incoming TCP-packets */
-	uint64_t record_seq_write;    /* sequence number for each record */
-	uint64_t record_seq_read;     /* sequence number for each record */
-	uint16_t epoch_write;         /* only for DTLS */
-	uint16_t epoch_read;          /* only for DTLS */
-	size_t record_bytes_write;
-	size_t record_bytes_read;
-	size_t record_fragment_size;
-	uint64_t next_receive_seq;  /* DTLS only */
-
-	struct list exts_remote;
-};
 
 
 static int encrypt_send_record(struct tls_session *sess,
@@ -2074,43 +1999,6 @@ void tls_session_set_certificate2(struct tls_session *sess,
 
 	mem_deref(sess->cert_local);
 	sess->cert_local = mem_ref(cert);
-}
-
-
-void tls_trace(struct tls_session *sess, enum tls_trace_flags flags,
-		const char *fmt, ...)
-{
-	char buf[1024];
-	va_list ap;
-	int r;
-
-	if (!sess || !fmt)
-		return;
-
-	if (!(sess->trace_flags & flags))
-		return;
-	if (!sess->traceh)
-		return;
-
-	va_start(ap, fmt);
-	r = re_vsnprintf(buf, sizeof(buf), fmt, ap);
-	va_end(ap);
-
-	if (r < 0)
-		return;
-
-	sess->traceh(flags, buf, sess->arg);
-}
-
-
-void tls_set_trace(struct tls_session *sess, enum tls_trace_flags flags,
-		    tls_trace_h *traceh)
-{
-	if (!sess)
-		return;
-
-	sess->trace_flags = flags;
-	sess->traceh = traceh;
 }
 
 

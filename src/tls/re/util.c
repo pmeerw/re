@@ -32,17 +32,3 @@ void mem_cpy(uint8_t *dst, size_t dst_sz,
 
 	memcpy(dst, src, src_sz);
 }
-
-
-const char *tls_trace_name(enum tls_trace_flags flag)
-{
-	switch (flag) {
-
-	case TLS_TRACE_RECORD:             return "RECORD";
-	case TLS_TRACE_CHANGE_CIPHER_SPEC: return "CHANGE_CIPHER_SPEC";
-	case TLS_TRACE_ALERT:              return "ALERT";
-	case TLS_TRACE_HANDSHAKE:          return "HANDSHAKE";
-	case TLS_TRACE_APPLICATION_DATA:   return "APPLICATION_DATA";
-	default:                            return "???";
-	}
-}

@@ -25,6 +25,7 @@ SRCS	+= tls/re/prf.c
 SRCS	+= tls/re/record.c
 SRCS	+= tls/re/secparam.c
 SRCS	+= tls/re/session.c
+SRCS	+= tls/re/trace.c
 SRCS	+= tls/re/util.c
 SRCS	+= tls/re/vector.c
 SRCS	+= tls/re/version.c

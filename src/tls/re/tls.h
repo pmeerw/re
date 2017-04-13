@@ -5,6 +5,11 @@
  */
 
 
+#define TLS_MAX_RSA_BYTES 512  /* 4096 bits */
+
+#define DTLS_COOKIE_LENGTH 256
+
+
 struct tls {
 	struct cert *cert;
 	enum tls_version version;
@@ -101,6 +106,78 @@ struct tls_extension *tls_extensions_apply(const struct list *extl,
 /*
  * session
  */
+
+/* XXX: split into client.c and server.c */
+struct tls_session {
+	const struct tls *tls;               /* pointer to parent context */
+
+	struct tls_secparam sp_write;
+	struct tls_secparam sp_read;
+
+	struct tls_key_block key_block;
+
+	enum tls_connection_end conn_end;
+	enum tls_version version;
+
+	enum tls_cipher_suite *cipherv;
+	size_t cipherc;
+
+	enum tls_cipher_suite selected_cipher_suite;
+
+	const struct tls_suite *suite;
+
+	uint8_t pre_master_secret[48];
+	uint8_t encr_pre_master_secret[TLS_MAX_RSA_BYTES];
+	size_t encr_pre_master_secret_len;
+
+	/* certificates (X509v3) */
+	struct cert *cert_local;
+	struct cert *cert_remote;
+
+	/* callback handlers */
+	tls_sess_send_h *sendh;
+	tls_data_recv_h *datarecvh;
+	tls_sess_estab_h *estabh;
+	tls_sess_close_h *closeh;
+	void *arg;
+
+	enum tls_trace_flags trace_flags;
+	tls_trace_h *traceh;
+
+	bool estab;
+	bool closed;
+	bool alert_sent;
+	bool got_ccs;
+
+	/*
+	 * PROTOCOL LAYERS BELOW:
+	 */
+
+	/* handshake layer: */
+	SHA256_CTX hand_ctx;          /* hash of Handshakes sent/received */
+	uint16_t hand_seq_write;
+	uint16_t hand_seq_read;
+	size_t hand_bytes_write;
+	size_t hand_bytes_read;
+	struct mbuf *hand_mb;         /* buffer incoming handshake fragments */
+
+	uint8_t hand_cookie[DTLS_COOKIE_LENGTH];    /* DTLS only */
+	size_t hand_cookie_len;
+
+	/* record layer: */
+	struct mbuf *mb_write;        /* buffer outgoing records */
+	struct mbuf *mb;              /* buffer for incoming TCP-packets */
+	uint64_t record_seq_write;    /* sequence number for each record */
+	uint64_t record_seq_read;     /* sequence number for each record */
+	uint16_t epoch_write;         /* only for DTLS */
+	uint16_t epoch_read;          /* only for DTLS */
+	size_t record_bytes_write;
+	size_t record_bytes_read;
+	size_t record_fragment_size;
+	uint64_t next_receive_seq;  /* DTLS only */
+
+	struct list exts_remote;
+};
 
 const struct list *tls_session_remote_exts(const struct tls_session *sess);
 

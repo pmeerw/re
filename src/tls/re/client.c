@@ -5,6 +5,7 @@
  */
 
 #include <string.h>
+#include <assert.h>
 #include <re_types.h>
 #include <re_fmt.h>
 #include <re_mem.h>
@@ -33,7 +34,14 @@ int tls_client_send_clienthello(struct tls_session *sess)
 	size_t i;
 	int err;
 
+	if (!sess)
+		return EINVAL;
+
+	assert(TLS_CLIENT == sess->conn_end);
+
 	datav = mem_alloc(sess->cipherc * sizeof(uint16_t), NULL);
+	if (!datav)
+		return ENOMEM;
 
 	memset(&hand, 0, sizeof(hand));
 
@@ -83,9 +91,15 @@ int tls_client_send_clienthello(struct tls_session *sess)
 
 
 int tls_client_handle_server_hello(struct tls_session *sess,
-				      const struct serverhello *hell)
+				   const struct serverhello *hell)
 {
 	int err = 0;
+
+	if (!sess || !hell)
+		return EINVAL;
+
+	if (TLS_CLIENT != sess->conn_end)
+		return EPROTO;
 
 	/* save the Server-random */
 	mem_cpy(sess->sp_read.server_random,

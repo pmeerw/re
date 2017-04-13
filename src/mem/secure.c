@@ -48,3 +48,22 @@ void secure_memclear(volatile uint8_t *volatile p, size_t n)
 	while (n--)
 		*p++ = 0;
 }
+
+
+/**
+ * Check in constant time if one or more bytes is non-zero.
+ *
+ * @param p Input buffer to check
+ * @param n Number of bytes
+ *
+ * @return True if one or more is set, False if all is zero
+ */
+bool secure_is_set(const volatile uint8_t *volatile p, size_t n)
+{
+	uint8_t val = 0;
+
+	while (n--)
+		val |= *p++;
+
+	return !!val;
+}

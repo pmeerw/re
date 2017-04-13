@@ -24,7 +24,6 @@
                        [0..47];
  * <pre>
  */
-static const uint8_t empty_random[32] = {0};
 
 
 int tls_master_secret_compute(uint8_t master_secret[48],
@@ -40,9 +39,14 @@ int tls_master_secret_compute(uint8_t master_secret[48],
 	    !client_random || !server_random)
 		return EINVAL;
 
-	if (0 == memcmp(client_random, empty_random, sizeof(empty_random)) ||
-	    0 == memcmp(server_random, empty_random, sizeof(empty_random))) {
-		re_printf("master_secret_compute: client/server random"
+	/* NOTE: debug only */
+	if (!secure_is_set(client_random, TLS_CLIENT_RANDOM_LEN)) {
+		re_printf("master_secret_compute: client random"
+			  " is not set\n");
+		return EPROTO;
+	}
+	if (!secure_is_set(server_random, TLS_SERVER_RANDOM_LEN)) {
+		re_printf("master_secret_compute: server random"
 			  " is not set\n");
 		return EPROTO;
 	}

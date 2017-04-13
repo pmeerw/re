@@ -33,9 +33,6 @@
 	(p) += (l);
 
 
-static const uint8_t empty_master_secret[TLS_MASTER_SECRET_LEN] = {0};
-
-
 /*
       key_block = PRF(SecurityParameters.master_secret,
                       "key expansion",
@@ -59,8 +56,8 @@ int tls_keys_generate(struct tls_key_block *keys,
 		return EALREADY;
 	}
 
-	if (0 == memcmp(sp->master_secret, empty_master_secret,
-			sizeof(sp->master_secret))) {
+	/* NOTE: debug only */
+	if (!secure_is_set(sp->master_secret, sizeof(sp->master_secret))) {
 		DEBUG_WARNING("tls_keys_generate: master secret not set\n");
 		return EPROTO;
 	}

@@ -101,6 +101,14 @@ int tls_client_handle_server_hello(struct tls_session *sess,
 	if (TLS_CLIENT != sess->conn_end)
 		return EPROTO;
 
+	if (sess->state != TLS_STATE_CLIENT_HELLO_SENT) {
+		DEBUG_WARNING("client: recv_server_hello:"
+			      " illegal state %d\n", sess->state);
+		return EPROTO;
+	}
+	if (sess->got_cert)
+		return EPROTO;
+
 	/* save the Server-random */
 	mem_cpy(sess->sp_read.server_random,
 		sizeof(sess->sp_read.server_random),

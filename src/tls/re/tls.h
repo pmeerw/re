@@ -10,6 +10,40 @@
 #define DTLS_COOKIE_LENGTH 256
 
 
+/*
+  State Machine:
+
+IDLE                                   IDLE
+
+      -------- ClientHello ------->
+CH                                      CH
+      <------- ServerHello -------
+      <------- Certificate -------
+      <----- ServerHelloDone -----
+SHD
+      ----- ClientKeyExchange ---->
+
+      ===== ChangeCipherSpec =====>
+      -------- Finished (*) ------>    FINI
+
+      <===== ChangeCipherSpec =====
+      <--------- Finished (*) -----
+FINI
+
+XXX: very simple fsm for now, improve later
+*/
+enum tls_state {
+
+	TLS_STATE_IDLE                   =  0,
+
+	TLS_STATE_CLIENT_HELLO_SENT      =  2,  /* client */
+	TLS_STATE_CLIENT_HELLO_RECV      =  3,  /* server */
+
+	TLS_STATE_SERVER_HELLO_DONE_RECV =  8,  /* client */
+	TLS_STATE_FINISHED_RECV          = 10,
+};
+
+
 struct tls {
 	struct cert *cert;
 	enum tls_version version;
@@ -148,6 +182,7 @@ struct tls_session {
 	bool closed;
 	bool alert_sent;
 	bool got_ccs;
+	bool got_cert;
 
 	/*
 	 * PROTOCOL LAYERS BELOW:
@@ -163,6 +198,7 @@ struct tls_session {
 
 	uint8_t hand_cookie[DTLS_COOKIE_LENGTH];    /* DTLS only */
 	size_t hand_cookie_len;
+	enum tls_state state;
 
 	/* record layer: */
 	struct mbuf *mb_write;        /* buffer outgoing records */
@@ -182,6 +218,8 @@ struct tls_session {
 const struct list *tls_session_remote_exts(const struct tls_session *sess);
 bool tls_cipher_suite_lookup(const struct tls_session *sess,
 			     enum tls_cipher_suite cs);
+void tls_session_set_state(struct tls_session *sess, enum tls_state state);
+const char *tls_state_name(enum tls_state st);
 
 int tls_client_send_clienthello(struct tls_session *sess);
 int tls_client_handle_server_hello(struct tls_session *sess,

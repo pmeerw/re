@@ -55,6 +55,23 @@ static void handshake_layer_append(struct tls_session *sess,
 static int handle_change_cipher_spec(struct tls_session *sess);
 
 
+void tls_session_set_state(struct tls_session *sess, enum tls_state state)
+{
+	if (state < sess->state) {
+		DEBUG_WARNING("illegal decrementing state transition from"
+			      " %d to %d\n", sess->state, state);
+		return;
+	}
+
+	re_printf("*** [%s] state transition:  %-22s  --->  %s\n",
+		  sess->conn_end == TLS_CLIENT ? "Client" : "Server",
+		  tls_state_name(sess->state),
+		  tls_state_name(state));
+
+	sess->state = state;
+}
+
+
 /*
  * HANDSHAKE LAYER
  */
@@ -596,6 +613,13 @@ int tls_session_start(struct tls_session *sess)
 	if (!sess)
 		return EINVAL;
 
+	if (sess->state != TLS_STATE_IDLE) {
+		DEBUG_WARNING("start: illegal state %d\n", sess->state);
+		return EPROTO;
+	}
+
+	tls_session_set_state(sess, TLS_STATE_CLIENT_HELLO_SENT);
+
 	return tls_client_send_clienthello(sess);
 }
 
@@ -831,6 +855,13 @@ static int handle_certificate(struct tls_session *sess,
 {
 	int err;
 
+	if (sess->got_cert) {
+		DEBUG_WARNING("already got certificate\n");
+		return EPROTO;
+	}
+
+	sess->got_cert = true;
+
 	if (certificate->count > 0) {
 
 		/* The sender's certificate MUST come first in the list */
@@ -986,6 +1017,19 @@ static int client_handle_server_hello_done(struct tls_session *sess)
 {
 	int err;
 
+	if (!sess->got_cert) {
+		DEBUG_WARNING("handle_server_hello_done: no certificate\n");
+		return EPROTO;
+	}
+
+	if (sess->state != TLS_STATE_CLIENT_HELLO_SENT) {
+		DEBUG_WARNING("client: recv_server_hello_done:"
+			      " illegal state %d\n", sess->state);
+		return EPROTO;
+	}
+
+	tls_session_set_state(sess, TLS_STATE_SERVER_HELLO_DONE_RECV);
+
 	/* NOTE: we must wait for all handshake messages
 	 * to be processed and hashed
 	 */
@@ -1023,6 +1067,15 @@ static int server_handle_client_hello(struct tls_session *sess,
 		err = EPROTO;
 		goto out;
 	}
+
+	if (sess->state != TLS_STATE_IDLE) {
+		DEBUG_WARNING("client_hello:"
+			      " illegal state %s\n",
+			      tls_state_name(sess->state));
+		return EPROTO;
+	}
+
+	tls_session_set_state(sess, TLS_STATE_CLIENT_HELLO_RECV);
 
 	suites = chell->cipher_suites.data;
 	n      = chell->cipher_suites.bytes / 2;
@@ -1110,6 +1163,29 @@ static int handle_finished(struct tls_session *sess,
 		DEBUG_WARNING("recv Finished, but no CCS received\n");
 		return EPROTO;
 	}
+
+	switch (sess->conn_end) {
+
+	case TLS_CLIENT:
+		if (sess->state != TLS_STATE_SERVER_HELLO_DONE_RECV) {
+			DEBUG_WARNING("finished:"
+				      " illegal state %s\n",
+				      tls_state_name(sess->state));
+			return EPROTO;
+		}
+		break;
+
+	case TLS_SERVER:
+		if (sess->state != TLS_STATE_CLIENT_HELLO_RECV) {
+			DEBUG_WARNING("finished:"
+				      " illegal state %s\n",
+				      tls_state_name(sess->state));
+			return EPROTO;
+		}
+		break;
+	}
+
+	tls_session_set_state(sess, TLS_STATE_FINISHED_RECV);
 
 	err = verify_finished(sess, fin);
 	if (err) {
@@ -1969,4 +2045,19 @@ int tls_session_get_servername(struct tls_session *sess,
 	str_ncpy(servername, ext->v.server_name.host, sz);
 
 	return 0;
+}
+
+
+const char *tls_state_name(enum tls_state st)
+{
+	switch (st) {
+
+	case TLS_STATE_IDLE:                   return "IDLE";
+	case TLS_STATE_CLIENT_HELLO_SENT:      return "CLIENT_HELLO_SENT";
+	case TLS_STATE_CLIENT_HELLO_RECV:      return "CLIENT_HELLO_RECV";
+	case TLS_STATE_SERVER_HELLO_DONE_RECV: return "SERVER_HELLO_DONE_RECV";
+	case TLS_STATE_FINISHED_RECV:          return "FINISHED_RECV";
+
+	default: return "???";
+	}
 }

@@ -12,6 +12,7 @@
 #include <re_mbuf.h>
 #include <re_list.h>
 #include <re_sys.h>
+#include <re_cert.h>
 #include <re_net.h>
 #include <re_srtp.h>
 #include <re_tls.h>
@@ -179,5 +180,76 @@ int tls_server_handle_client_hello(struct tls_session *sess,
 #endif
 
  out:
+	return err;
+}
+
+
+int tls_server_handle_clientkeyexchange(struct tls_session *sess,
+					const struct client_key_exchange *cke)
+{
+	uint8_t buf[512];
+	size_t buf_len = sizeof(buf);
+	uint16_t ver_be = htons(sess->version);
+	int err;
+
+	if (!sess || !cke)
+		return EINVAL;
+
+	if (sess->conn_end != TLS_SERVER)
+		return EPROTO;
+
+	/* decrypt PMS using local cert's private key */
+	err = cert_private_decrypt(sess->cert_local,
+				   buf, &buf_len,
+				   cke->encr_pms.data,
+				   cke->encr_pms.bytes);
+	if (err) {
+		DEBUG_WARNING("private_decrypt failed (%m)\n", err);
+		goto out;
+	}
+
+	/* TODO: continue the handshake to avoid the Bleichenbacher attack
+	 */
+	if (0 != memcmp(buf, &ver_be, 2)) {
+		DEBUG_WARNING("version rollback attack [0x%02x 0x%02x]\n",
+			      buf[0], buf[1]);
+	}
+
+	/* save the Pre master secret (cleartext) */
+	if (buf_len != sizeof(sess->pre_master_secret)) {
+		DEBUG_WARNING("illegal pms length\n");
+		err = EPROTO;
+		goto out;
+	}
+	mem_cpy(sess->pre_master_secret,
+		sizeof(sess->pre_master_secret),
+		buf, buf_len);
+
+#if 1
+	/* XXX: this can be moved elsewhere ? */
+
+	err = tls_master_secret_compute(sess->sp_read.master_secret,
+					sess->pre_master_secret,
+					sizeof(sess->pre_master_secret),
+					sess->sp_read.client_random,
+					sess->sp_read.server_random);
+	if (err) {
+		DEBUG_WARNING("master_secret_compute error (%m)\n", err);
+		goto out;
+	}
+
+	err = tls_master_secret_compute(sess->sp_write.master_secret,
+					sess->pre_master_secret,
+					sizeof(sess->pre_master_secret),
+					sess->sp_write.client_random,
+					sess->sp_write.server_random);
+	if (err) {
+		DEBUG_WARNING("master_secret_compute error (%m)\n", err);
+		goto out;
+	}
+#endif
+
+
+out:
 	return err;
 }

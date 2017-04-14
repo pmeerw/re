@@ -229,6 +229,8 @@ int tls_client_send_clientkeyexchange(struct tls_session *sess);
 
 int tls_server_handle_client_hello(struct tls_session *sess,
 				   const struct clienthello *chell);
+int tls_server_handle_clientkeyexchange(struct tls_session *sess,
+					const struct client_key_exchange *cke);
 
 int tls_handshake_layer_send(struct tls_session *sess,
 				enum tls_handshake_type msg_type,

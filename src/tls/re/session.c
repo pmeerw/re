@@ -593,53 +593,6 @@ static int send_change_cipher_spec(struct tls_session *sess)
 }
 
 
-/* send Client Key Exchange message */
-static int send_clientkeyexchange(struct tls_session *sess)
-{
-	struct tls_handshake hand;
-	int err;
-
-	memset(&hand, 0, sizeof(hand));
-
-	err = tls_vector_init(&hand.u.client_key_exchange.encr_pms,
-			       sess->encr_pre_master_secret,
-			       sess->encr_pre_master_secret_len);
-	if (err)
-		goto out;
-
-	err = tls_handshake_layer_send(sess, TLS_CLIENT_KEY_EXCHANGE,
-				   &hand.u, false, false);
-	if (err)
-		goto out;
-
-#if 1
-	/* XXX: this can be moved elsewhere ? */
-
-	err = tls_master_secret_compute(sess->sp_read.master_secret,
-					sess->pre_master_secret,
-					sizeof(sess->pre_master_secret),
-					sess->sp_read.client_random,
-					sess->sp_read.server_random);
-	if (err) {
-		DEBUG_WARNING("master_secret_compute error (%m)\n", err);
-		goto out;
-	}
-
-	err = tls_master_secret_compute(sess->sp_write.master_secret,
-					sess->pre_master_secret,
-					sizeof(sess->pre_master_secret),
-					sess->sp_write.client_random,
-					sess->sp_write.server_random);
-	if (err) {
-		DEBUG_WARNING("master_secret_compute error (%m)\n", err);
-		goto out;
-	}
-#endif
-
- out:
-	tls_vector_reset(&hand.u.client_key_exchange.encr_pms);
-	return err;
-}
 
 
 static int encrypt_send_record(struct tls_session *sess,
@@ -975,7 +928,9 @@ static int client_handle_server_hello_done(struct tls_session *sess)
 	/* NOTE: we must wait for all handshake messages
 	 * to be processed and hashed
 	 */
-	send_clientkeyexchange(sess);
+	err = tls_client_send_clientkeyexchange(sess);
+	if (err)
+		return err;
 
 	/* Send ChangeCipherSpec protocol */
 	err = send_change_cipher_spec(sess);

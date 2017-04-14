@@ -225,6 +225,7 @@ int tls_send_certificate(struct tls_session *sess);
 int tls_client_send_clienthello(struct tls_session *sess);
 int tls_client_handle_server_hello(struct tls_session *sess,
 				   const struct serverhello *hell);
+int tls_client_send_clientkeyexchange(struct tls_session *sess);
 
 int tls_server_handle_client_hello(struct tls_session *sess,
 				   const struct clienthello *chell);

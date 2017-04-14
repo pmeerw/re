@@ -148,3 +148,57 @@ int tls_client_handle_server_hello(struct tls_session *sess,
  out:
 	return err;
 }
+
+
+/* send Client Key Exchange message */
+int tls_client_send_clientkeyexchange(struct tls_session *sess)
+{
+	struct tls_handshake hand;
+	int err;
+
+	if (!sess)
+		return EINVAL;
+
+	assert(TLS_CLIENT == sess->conn_end);
+
+	memset(&hand, 0, sizeof(hand));
+
+	err = tls_vector_init(&hand.u.client_key_exchange.encr_pms,
+			       sess->encr_pre_master_secret,
+			       sess->encr_pre_master_secret_len);
+	if (err)
+		goto out;
+
+	err = tls_handshake_layer_send(sess, TLS_CLIENT_KEY_EXCHANGE,
+				   &hand.u, false, false);
+	if (err)
+		goto out;
+
+#if 1
+	/* XXX: this can be moved elsewhere ? */
+
+	err = tls_master_secret_compute(sess->sp_read.master_secret,
+					sess->pre_master_secret,
+					sizeof(sess->pre_master_secret),
+					sess->sp_read.client_random,
+					sess->sp_read.server_random);
+	if (err) {
+		DEBUG_WARNING("master_secret_compute error (%m)\n", err);
+		goto out;
+	}
+
+	err = tls_master_secret_compute(sess->sp_write.master_secret,
+					sess->pre_master_secret,
+					sizeof(sess->pre_master_secret),
+					sess->sp_write.client_random,
+					sess->sp_write.server_random);
+	if (err) {
+		DEBUG_WARNING("master_secret_compute error (%m)\n", err);
+		goto out;
+	}
+#endif
+
+ out:
+	tls_vector_reset(&hand.u.client_key_exchange.encr_pms);
+	return err;
+}

@@ -220,10 +220,14 @@ bool tls_cipher_suite_lookup(const struct tls_session *sess,
 			     enum tls_cipher_suite cs);
 void tls_session_set_state(struct tls_session *sess, enum tls_state state);
 const char *tls_state_name(enum tls_state st);
+int tls_send_certificate(struct tls_session *sess);
 
 int tls_client_send_clienthello(struct tls_session *sess);
 int tls_client_handle_server_hello(struct tls_session *sess,
 				   const struct serverhello *hell);
+
+int tls_server_handle_client_hello(struct tls_session *sess,
+				   const struct clienthello *chell);
 
 int tls_handshake_layer_send(struct tls_session *sess,
 				enum tls_handshake_type msg_type,

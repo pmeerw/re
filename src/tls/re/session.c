@@ -41,14 +41,6 @@
 
 static int encrypt_send_record(struct tls_session *sess,
 			       enum tls_content_type type, struct mbuf *data);
-static int record_layer_flush(struct tls_session *sess);
-static int record_layer_write(struct tls_session *sess,
-			      enum tls_content_type type,
-			      const uint8_t *frag, size_t fraglen,
-			      bool flush_now);
-static int record_layer_send(struct tls_session *sess,
-			     enum tls_content_type type,
-			     struct mbuf *mb_data, bool flush_now);
 static void handshake_layer_append(struct tls_session *sess,
 				   bool is_write,
 				   const uint8_t *data, size_t len);
@@ -108,7 +100,7 @@ int tls_handshake_layer_send(struct tls_session *sess,
 		err = encrypt_send_record(sess, TLS_HANDSHAKE, mb);
 	}
 	else {
-		err = record_layer_send(sess, TLS_HANDSHAKE, mb, flush_now);
+		err = tls_record_layer_send(sess, TLS_HANDSHAKE, mb, flush_now);
 	}
 	if (err)
 		goto out;
@@ -156,156 +148,6 @@ static int handshake_layer_get_md(const struct tls_session *sess,
 	SHA256_Final(md, &copy);
 
 	return 0;
-}
-
-
-/*
- * RECORD LAYER
- */
-
-
-/* this function sends a large payload data, and does fragmentation */
-static int record_layer_send(struct tls_session *sess,
-			     enum tls_content_type type,
-			     struct mbuf *mb_data, bool flush_now)
-{
-	int err = 0;
-
-#if 0
-	tls_trace(sess, TLS_TRACE_RECORD,
-		   "record layer send "
-		   "(type=%s datalen=%zu bytes %s)\n",
-		   tls_content_type_name(type), mbuf_get_left(mb_data),
-		   flush_now ? "FLUSH" : "");
-#endif
-
-	while (mbuf_get_left(mb_data)) {
-
-		size_t sz = min(sess->record_fragment_size,
-				mbuf_get_left(mb_data));
-
-		err = record_layer_write(sess,
-					 type,
-					 mbuf_buf(mb_data), sz,
-					 flush_now);
-		if (err)
-			return err;
-
-		mbuf_advance(mb_data, sz);
-	}
-
-	return err;
-}
-
-
-/* this function sends only 1 (one) fragment (!) */
-static int record_layer_write(struct tls_session *sess,
-			      enum tls_content_type type,
-			      const uint8_t *frag, size_t fraglen,
-			      bool flush_now)
-{
-	int err;
-
-	tls_trace(sess, TLS_TRACE_RECORD,
-		   "record layer write fragment "
-		   "(type=%s fraglen=%zu bytes %s)\n",
-		   tls_content_type_name(type), fraglen,
-		   flush_now ? "FLUSH" : "");
-
-	mbuf_skip_to_end(sess->mb_write);
-
-	err = tls_record_encode(sess->mb_write, sess->version, type,
-				 sess->epoch_write,
-				 sess->record_seq_write,
-				 frag, fraglen);
-	if (err)
-		goto out;
-
-	++sess->record_seq_write;
-
-	if (flush_now) {
-		err = record_layer_flush(sess);
-		if (err)
-			goto out;
-	}
-
- out:
-	return err;
-}
-
-
-/* Flush the buffer to the network */
-static int record_layer_flush(struct tls_session *sess)
-{
-	int err;
-
-	sess->mb_write->pos = MBUF_HEADROOM;
-
-	if (!mbuf_get_left(sess->mb_write)) {
-		DEBUG_WARNING("record_layer_flush: no data to send!\n");
-		return EINVAL;
-	}
-
-	sess->record_bytes_write += mbuf_get_left(sess->mb_write);
-
-	if (sess->sendh)
-		err = sess->sendh(sess->mb_write, sess->arg);
-	else
-		err = EIO;
-	if (err)
-		goto out;
-
-	sess->mb_write->pos = MBUF_HEADROOM;
-	sess->mb_write->end = MBUF_HEADROOM;
-
- out:
-	return err;
-}
-
-
-static void record_layer_new_write_epoch(struct tls_session *sess)
-{
-	/* new epoch, reset sequence number */
-	++sess->epoch_write;
-	sess->record_seq_write = 0;
-}
-
-
-static void record_layer_new_read_epoch(struct tls_session *sess)
-{
-	/* new epoch, reset sequence number */
-	++sess->epoch_read;
-	sess->record_seq_read = 0;
-
-	sess->next_receive_seq = 0;
-}
-
-
-static uint64_t record_get_read_seqnum(const struct tls_session *sess)
-{
-	uint64_t epoch_seq;
-
-	epoch_seq = sess->record_seq_read;
-
-	if (tls_version_is_dtls(sess->version)) {
-		epoch_seq |= ((uint64_t)sess->epoch_read) << 48;
-	}
-
-	return epoch_seq;
-}
-
-
-static uint64_t record_get_write_seqnum(const struct tls_session *sess)
-{
-	uint64_t epoch_seq;
-
-	epoch_seq = sess->record_seq_write;
-
-	if (tls_version_is_dtls(sess->version)) {
-		epoch_seq |= ((uint64_t)sess->epoch_write) << 48;
-	}
-
-	return epoch_seq;
 }
 
 
@@ -576,13 +418,13 @@ static int send_change_cipher_spec(struct tls_session *sess)
 	tls_trace(sess, TLS_TRACE_CHANGE_CIPHER_SPEC,
 		   "send ChangeCipherSpec\n");
 
-	err = record_layer_write(sess, TLS_CHANGE_CIPHER_SPEC,
-				 mb_pld.buf, mb_pld.end,
-				 false);
+	err = tls_record_layer_write(sess, TLS_CHANGE_CIPHER_SPEC,
+				     mb_pld.buf, mb_pld.end,
+				     false);
 	if (err)
 		goto out;
 
-	record_layer_new_write_epoch(sess);
+	tls_record_layer_new_write_epoch(sess);
 
 	err = tls_secparam_set(&sess->sp_write, sess->suite);
 	if (err) {
@@ -622,7 +464,7 @@ static int encrypt_send_record(struct tls_session *sess,
 	case TLS_MAC_HMAC_SHA256:
 
 		err = tls_mac_generate(mac, mac_sz, write_MAC_key,
-				       record_get_write_seqnum(sess),
+				       tls_record_get_write_seqnum(sess),
 				       type, sess->version,
 				       data->end, /* length w/o MAC */
 				       data->buf);
@@ -682,9 +524,9 @@ static int encrypt_send_record(struct tls_session *sess,
 
 	mb_enc->pos = 0;
 
-	err = record_layer_write(sess, type,
-				 mbuf_buf(mb_enc), mbuf_get_left(mb_enc),
-				 true);
+	err = tls_record_layer_write(sess, type,
+				     mbuf_buf(mb_enc), mbuf_get_left(mb_enc),
+				     true);
 	if (err)
 		goto out;
 
@@ -1132,7 +974,8 @@ static int record_decrypt_aes_and_unmac(struct tls_session *sess,
 		return EINVAL;
 
 	err = tls_mac_generate(mac_gen, mac_sz, write_MAC_key,
-			       record_get_read_seqnum(sess), rec->content_type,
+			       tls_record_get_read_seqnum(sess),
+			       rec->content_type,
 			       rec->proto_ver, content_len,
 			       &mbf.buf[pos_content]);
 	if (err)
@@ -1147,7 +990,7 @@ static int record_decrypt_aes_and_unmac(struct tls_session *sess,
 		re_printf("write_MAC_key:  %w\n",
 			  write_MAC_key->k, write_MAC_key->len);
 		re_printf("read_seq_num:   %llu\n",
-			  record_get_read_seqnum(sess));
+			  tls_record_get_read_seqnum(sess));
 		re_printf("MAC: generated: %w\n", mac_gen, mac_sz);
 		re_printf("     packet:    %w\n", mac_pkt, mac_sz);
 		return EBADMSG;
@@ -1460,7 +1303,7 @@ static int handle_change_cipher_spec(struct tls_session *sess)
 	}
 
 	/* new epoch, reset sequence number */
-	record_layer_new_read_epoch(sess);
+	tls_record_layer_new_read_epoch(sess);
 
 	if (sess->conn_end == TLS_SERVER) {
 

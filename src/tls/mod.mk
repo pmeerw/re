@@ -24,6 +24,7 @@ SRCS	+= tls/re/master.c
 SRCS	+= tls/re/mbuf.c
 SRCS	+= tls/re/prf.c
 SRCS	+= tls/re/record.c
+SRCS	+= tls/re/record_layer.c
 SRCS	+= tls/re/secparam.c
 SRCS	+= tls/re/server.c
 SRCS	+= tls/re/session.c

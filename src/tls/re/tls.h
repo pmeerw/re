@@ -244,6 +244,18 @@ int tls_handshake_layer_send(struct tls_session *sess,
 				const union handshake *hand,
 			     bool flush_now, bool crypt);
 
+int tls_record_layer_write(struct tls_session *sess,
+			   enum tls_content_type type,
+			   const uint8_t *frag, size_t fraglen,
+			   bool flush_now);
+int tls_record_layer_send(struct tls_session *sess,
+			  enum tls_content_type type,
+			  struct mbuf *mb_data, bool flush_now);
+void tls_record_layer_new_write_epoch(struct tls_session *sess);
+void tls_record_layer_new_read_epoch(struct tls_session *sess);
+uint64_t tls_record_get_read_seqnum(const struct tls_session *sess);
+uint64_t tls_record_get_write_seqnum(const struct tls_session *sess);
+
 
 /*
  * version

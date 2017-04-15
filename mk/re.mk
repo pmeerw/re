@@ -480,7 +480,7 @@ endif
 
 # TODO: do we need to link to -lssl ?
 CFLAGS  += -DUSE_OPENSSL -DUSE_TLS
-LIBS    += -lssl -lcrypto
+LIBS    += -lcrypto
 USE_TLS := yes
 
 USE_OPENSSL_DTLS := $(shell [ -f $(SYSROOT)/include/openssl/dtls1.h ] || \
@@ -711,6 +711,8 @@ info:
 	@echo "  LIBRE_INC:     $(LIBRE_INC)"
 	@echo "  LIBRE_SO:      $(LIBRE_SO)"
 	@echo "  USE_OPENSSL:   $(USE_OPENSSL)"
+	@echo "  USE_OPENSSL_TLS:   $(USE_OPENSSL_TLS)"
+	@echo "  USE_OPENSSL_DTLS:  $(USE_OPENSSL_DTLS)"
 	@echo "  USE_OPENSSL_AES:   $(USE_OPENSSL_AES)"
 	@echo "  USE_OPENSSL_HMAC:  $(USE_OPENSSL_HMAC)"
 	@echo "  USE_TLS:       $(USE_TLS)"

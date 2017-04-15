@@ -63,10 +63,12 @@ void tls_session_set_state(struct tls_session *sess, enum tls_state state)
 		return;
 	}
 
+#if 0
 	re_printf("*** [%s] state transition:  %-22s  --->  %s\n",
 		  sess->conn_end == TLS_CLIENT ? "Client" : "Server",
 		  tls_state_name(sess->state),
 		  tls_state_name(state));
+#endif
 
 	sess->state = state;
 }
@@ -591,8 +593,6 @@ static int send_change_cipher_spec(struct tls_session *sess)
  out:
 	return err;
 }
-
-
 
 
 static int encrypt_send_record(struct tls_session *sess,

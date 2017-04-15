@@ -149,8 +149,10 @@ int openssl_init(void)
 	(void)signal(SIGPIPE, sigpipe_handler);
 #endif
 
+#ifdef USE_OPENSSL_TLS
 	SSL_library_init();
 	SSL_load_error_strings();
+#endif
 
 	return 0;
 }

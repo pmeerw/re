@@ -96,7 +96,7 @@ int tls_handshake_layer_send(struct tls_session *sess,
 		return ENOMEM;
 
 	err = tls_handshake_encode(mb, sess->version, msg_type,
-				    sess->hand_seq_write, 0, hand);
+				    sess->handshake.seq_write, 0, hand);
 	if (err)
 		goto out;
 
@@ -113,7 +113,7 @@ int tls_handshake_layer_send(struct tls_session *sess,
 	if (err)
 		goto out;
 
-	++sess->hand_seq_write;
+	++sess->handshake.seq_write;
 
  out:
 	mem_deref(mb);
@@ -129,11 +129,11 @@ static void handshake_layer_append(struct tls_session *sess,
 		return;
 
 	if (is_write)
-		sess->hand_bytes_write += len;
+		sess->handshake.bytes_write += len;
 	else
-		sess->hand_bytes_read += len;
+		sess->handshake.bytes_read += len;
 
-	SHA256_Update(&sess->hand_ctx, data, len);
+	SHA256_Update(&sess->handshake.ctx, data, len);
 
 #if 0
 	re_printf("   >>> HANDSHAKE %s: %zu bytes (Total %zu)\n",
@@ -152,7 +152,7 @@ static int handshake_layer_get_md(const struct tls_session *sess,
 	if (!sess || !md)
 		return EINVAL;
 
-	copy = sess->hand_ctx;
+	copy = sess->handshake.ctx;
 	SHA256_Final(md, &copy);
 
 	return 0;
@@ -529,7 +529,7 @@ int  tls_session_alloc(struct tls_session **sessp,
 		sess->pre_master_secret[1] = (unsigned)ver & 0xff;
 	}
 
-	SHA256_Init(&sess->hand_ctx);
+	SHA256_Init(&sess->handshake.ctx);
 
 	sess->mb_write = mbuf_alloc(64);
 	if (!sess->mb_write) {
@@ -943,7 +943,7 @@ static void process_handshake(struct tls_session *sess,
 		   "recv handshake: type=%s, payload_length=%zu\n",
 		   tls_handshake_name(hand->msg_type), hand->length);
 
-	++sess->hand_seq_read;
+	++sess->handshake.seq_read;
 
 	/* XXX: exclude Finished, that is a hack */
 	if (hand->msg_type != TLS_FINISHED) {
@@ -978,7 +978,7 @@ static void process_handshake(struct tls_session *sess,
 		 * ClientHello and HelloVerifyRequest MUST NOT be included
 		 * in the CertificateVerify or Finished MAC computations.
 		 */
-		SHA256_Init(&sess->hand_ctx);
+		SHA256_Init(&sess->handshake.ctx);
 
 		err = tls_client_send_clienthello(sess);
 	}
@@ -1657,9 +1657,9 @@ void tls_session_summary(const struct tls_session *sess)
 
 	re_printf("~~~ Handshake-layer:  ~~~\n");
 	re_printf("___ write_seq: %u    (%zu bytes)\n",
-		  sess->hand_seq_write, sess->hand_bytes_write);
+		  sess->handshake.seq_write, sess->handshake.bytes_write);
 	re_printf("___ read_seq:  %u    (%zu bytes)\n",
-		  sess->hand_seq_read, sess->hand_bytes_read);
+		  sess->handshake.seq_read, sess->handshake.bytes_read);
 	re_printf("\n");
 
 	re_printf("~~~ Record-layer:  ~~~\n");

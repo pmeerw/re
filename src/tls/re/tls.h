@@ -189,11 +189,17 @@ struct tls_session {
 	 */
 
 	/* handshake layer: */
-	SHA256_CTX hand_ctx;          /* hash of Handshakes sent/received */
-	uint16_t hand_seq_write;
-	uint16_t hand_seq_read;
-	size_t hand_bytes_write;
-	size_t hand_bytes_read;
+	struct {
+
+		SHA256_CTX ctx;          /* hash of Handshakes sent/received */
+
+		uint16_t seq_write;
+		uint16_t seq_read;
+		size_t bytes_write;
+		size_t bytes_read;
+
+	} handshake;
+
 	struct mbuf *hand_mb;         /* buffer incoming handshake fragments */
 
 	uint8_t hand_cookie[DTLS_COOKIE_LENGTH];    /* DTLS only */

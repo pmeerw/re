@@ -477,8 +477,10 @@ int cert_private_decrypt(struct cert *cert,
 	r = RSA_private_decrypt((int)in_len, in,
 				out, cert->rsa, RSA_PKCS1_PADDING);
 	if (r == -1) {
+		err = EBADMSG;
 		DEBUG_WARNING("decrypt: %s\n",
 			      ERR_error_string(ERR_get_error(), NULL));
+		ERR_clear_error();
 		goto out;
 	}
 	if (r > (int)(*out_len)) {

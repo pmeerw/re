@@ -445,7 +445,7 @@ static void destructor(void *data)
 	if (sess->estab)
 		send_alert(sess, TLS_LEVEL_WARNING, TLS_ALERT_CLOSE_NOTIFY);
 
-	mem_deref(sess->hand_mb);
+	mem_deref(sess->handshake.mb);
 	mem_deref(sess->mb);
 	mem_deref(sess->mb_write);
 	mem_deref(sess->cert_local);
@@ -970,8 +970,8 @@ static void process_handshake(struct tls_session *sess,
 		cook = &hand->u.hello_verify_req.cookie;
 
 		/* save the cookie from server */
-		memcpy(sess->hand_cookie, cook->data, cook->bytes);
-		sess->hand_cookie_len = cook->bytes;
+		memcpy(sess->handshake.cookie, cook->data, cook->bytes);
+		sess->handshake.cookie_len = cook->bytes;
 
 		/*
 		 * in cases where the cookie exchange is used, the initial
@@ -1184,21 +1184,21 @@ static int handle_handshake_fragment(struct tls_session *sess,
 	/*
 	 * Part I -- write record to handshake buffer
 	 */
-	if (!sess->hand_mb) {
-		sess->hand_mb = mbuf_alloc(64);
-		if (!sess->hand_mb)
+	if (!sess->handshake.mb) {
+		sess->handshake.mb = mbuf_alloc(64);
+		if (!sess->handshake.mb)
 			return ENOMEM;
 	}
 
-	pos = sess->hand_mb->pos;
+	pos = sess->handshake.mb->pos;
 
-	sess->hand_mb->pos = sess->hand_mb->end;
+	sess->handshake.mb->pos = sess->handshake.mb->end;
 
-	err = mbuf_write_mem(sess->hand_mb, rec->fragment, rec->length);
+	err = mbuf_write_mem(sess->handshake.mb, rec->fragment, rec->length);
 	if (err)
 		return err;
 
-	sess->hand_mb->pos = pos;
+	sess->handshake.mb->pos = pos;
 
 	rec = NULL;  /* not used anymore */
 
@@ -1212,20 +1212,20 @@ static int handle_handshake_fragment(struct tls_session *sess,
 		size_t length;
 		bool stop = false;
 
-		pos = sess->hand_mb->pos;
+		pos = sess->handshake.mb->pos;
 
-		frag = mbuf_buf(sess->hand_mb);
+		frag = mbuf_buf(sess->handshake.mb);
 
 		err = tls_handshake_decode(&handshake,
-					    ver, sess->hand_mb);
+					    ver, sess->handshake.mb);
 		if (err) {
-			sess->hand_mb->pos = pos;
+			sess->handshake.mb->pos = pos;
 			if (err == ENODATA)
 				err = 0;
 			break;
 		}
 
-		length = sess->hand_mb->pos - pos;
+		length = sess->handshake.mb->pos - pos;
 
 		mem_ref(sess);
 		process_handshake(sess, frag, length, handshake);
@@ -1233,8 +1233,8 @@ static int handle_handshake_fragment(struct tls_session *sess,
 		mem_deref(handshake);
 
 		/* todo: the handler might deref session */
-		if (sess->hand_mb->pos >= sess->hand_mb->end) {
-			sess->hand_mb = mem_deref(sess->hand_mb);
+		if (sess->handshake.mb->pos >= sess->handshake.mb->end) {
+			sess->handshake.mb = mem_deref(sess->handshake.mb);
 			stop = true;
 		}
 		if (sess->closed)

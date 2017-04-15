@@ -198,12 +198,13 @@ struct tls_session {
 		size_t bytes_write;
 		size_t bytes_read;
 
+		struct mbuf *mb;     /* buffer incoming handshake fragments */
+
+		uint8_t cookie[DTLS_COOKIE_LENGTH];    /* DTLS only */
+		size_t cookie_len;
+
 	} handshake;
 
-	struct mbuf *hand_mb;         /* buffer incoming handshake fragments */
-
-	uint8_t hand_cookie[DTLS_COOKIE_LENGTH];    /* DTLS only */
-	size_t hand_cookie_len;
 	enum tls_state state;
 
 	/* record layer: */

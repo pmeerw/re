@@ -52,9 +52,9 @@ int tls_client_send_clienthello(struct tls_session *sess)
 		sizeof(sess->sp_write.client_random));
 
 	/* Optional cookie for DTLS */
-	if (sess->hand_cookie_len) {
-		hello->cookie.data = sess->hand_cookie;
-		hello->cookie.bytes = sess->hand_cookie_len;
+	if (sess->handshake.cookie_len) {
+		hello->cookie.data = sess->handshake.cookie;
+		hello->cookie.bytes = sess->handshake.cookie_len;
 	}
 
 	for (i=0; i<sess->cipherc; i++) {

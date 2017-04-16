@@ -209,14 +209,16 @@ struct tls_session {
 
 	/* record layer: */
 	struct {
-		struct mbuf *mb_write;   /* buffer outgoing records */
-		struct mbuf *mb;         /* buffer for incoming TCP-packets */
+		struct mbuf *mb_write;  /* buffer outgoing records         */
+		struct mbuf *mb;        /* buffer for incoming TCP-packets */
+
+		uint64_t seq_write;     /* sequence number for each record */
+		uint64_t seq_read;      /* sequence number for each record */
+		uint16_t epoch_write;   /* only for DTLS */
+		uint16_t epoch_read;    /* only for DTLS */
+
 	} record_layer;
 
-	uint64_t record_seq_write;    /* sequence number for each record */
-	uint64_t record_seq_read;     /* sequence number for each record */
-	uint16_t epoch_write;         /* only for DTLS */
-	uint16_t epoch_read;          /* only for DTLS */
 	size_t record_bytes_write;
 	size_t record_bytes_read;
 	size_t record_fragment_size;

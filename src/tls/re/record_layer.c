@@ -84,13 +84,13 @@ int tls_record_layer_write(struct tls_session *sess,
 
 	err = tls_record_encode(sess->record_layer.mb_write,
 				sess->version, type,
-				 sess->epoch_write,
-				 sess->record_seq_write,
-				 frag, fraglen);
+				sess->record_layer.epoch_write,
+				sess->record_layer.seq_write,
+				frag, fraglen);
 	if (err)
 		goto out;
 
-	++sess->record_seq_write;
+	++sess->record_layer.seq_write;
 
 	if (flush_now) {
 		err = record_layer_flush(sess);
@@ -135,16 +135,16 @@ static int record_layer_flush(struct tls_session *sess)
 void tls_record_layer_new_write_epoch(struct tls_session *sess)
 {
 	/* new epoch, reset sequence number */
-	++sess->epoch_write;
-	sess->record_seq_write = 0;
+	++sess->record_layer.epoch_write;
+	sess->record_layer.seq_write = 0;
 }
 
 
 void tls_record_layer_new_read_epoch(struct tls_session *sess)
 {
 	/* new epoch, reset sequence number */
-	++sess->epoch_read;
-	sess->record_seq_read = 0;
+	++sess->record_layer.epoch_read;
+	sess->record_layer.seq_read = 0;
 
 	sess->next_receive_seq = 0;
 }
@@ -154,10 +154,10 @@ uint64_t tls_record_get_read_seqnum(const struct tls_session *sess)
 {
 	uint64_t epoch_seq;
 
-	epoch_seq = sess->record_seq_read;
+	epoch_seq = sess->record_layer.seq_read;
 
 	if (tls_version_is_dtls(sess->version)) {
-		epoch_seq |= ((uint64_t)sess->epoch_read) << 48;
+		epoch_seq |= ((uint64_t)sess->record_layer.epoch_read) << 48;
 	}
 
 	return epoch_seq;
@@ -168,10 +168,10 @@ uint64_t tls_record_get_write_seqnum(const struct tls_session *sess)
 {
 	uint64_t epoch_seq;
 
-	epoch_seq = sess->record_seq_write;
+	epoch_seq = sess->record_layer.seq_write;
 
 	if (tls_version_is_dtls(sess->version)) {
-		epoch_seq |= ((uint64_t)sess->epoch_write) << 48;
+		epoch_seq |= ((uint64_t)sess->record_layer.epoch_write) << 48;
 	}
 
 	return epoch_seq;

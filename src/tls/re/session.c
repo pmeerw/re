@@ -1213,7 +1213,7 @@ static int handle_record(struct tls_session *sess, struct tls_record *rec)
 
 	if (tls_version_is_dtls(sess->version)) {
 
-		if (rec->epoch == sess->epoch_read &&
+		if (rec->epoch == sess->record_layer.epoch_read &&
 		    rec->seq == sess->next_receive_seq) {
 
 			++sess->next_receive_seq;
@@ -1253,7 +1253,7 @@ static int handle_record(struct tls_session *sess, struct tls_record *rec)
 	}
 
 	/* increment sequence number, before passing on to upper layer */
-	++sess->record_seq_read;
+	++sess->record_layer.seq_read;
 
 	/* Pass the Record on to upper layers */
 	handle_cleartext_record(sess, rec);
@@ -1510,10 +1510,10 @@ void tls_session_summary(const struct tls_session *sess)
 
 	re_printf("~~~ Record-layer:  ~~~\n");
 	re_printf("___ write_seq %u.%llu    (%zu bytes)\n",
-		  sess->epoch_write, sess->record_seq_write,
+		  sess->record_layer.epoch_write, sess->record_layer.seq_write,
 		  sess->record_bytes_write);
 	re_printf("___ read_seq  %u.%llu    (%zu bytes)\n",
-		  sess->epoch_read, sess->record_seq_read,
+		  sess->record_layer.epoch_read, sess->record_layer.seq_read,
 		  sess->record_bytes_read);
 
 	if (sess->record_layer.mb_write->end) {

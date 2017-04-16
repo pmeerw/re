@@ -80,9 +80,10 @@ int tls_record_layer_write(struct tls_session *sess,
 		   tls_content_type_name(type), fraglen,
 		   flush_now ? "FLUSH" : "");
 
-	mbuf_skip_to_end(sess->mb_write);
+	mbuf_skip_to_end(sess->record_layer.mb_write);
 
-	err = tls_record_encode(sess->mb_write, sess->version, type,
+	err = tls_record_encode(sess->record_layer.mb_write,
+				sess->version, type,
 				 sess->epoch_write,
 				 sess->record_seq_write,
 				 frag, fraglen);
@@ -107,24 +108,24 @@ static int record_layer_flush(struct tls_session *sess)
 {
 	int err;
 
-	sess->mb_write->pos = MBUF_HEADROOM;
+	sess->record_layer.mb_write->pos = MBUF_HEADROOM;
 
-	if (!mbuf_get_left(sess->mb_write)) {
+	if (!mbuf_get_left(sess->record_layer.mb_write)) {
 		DEBUG_WARNING("record_layer_flush: no data to send!\n");
 		return EINVAL;
 	}
 
-	sess->record_bytes_write += mbuf_get_left(sess->mb_write);
+	sess->record_bytes_write += mbuf_get_left(sess->record_layer.mb_write);
 
 	if (sess->sendh)
-		err = sess->sendh(sess->mb_write, sess->arg);
+		err = sess->sendh(sess->record_layer.mb_write, sess->arg);
 	else
 		err = EIO;
 	if (err)
 		goto out;
 
-	sess->mb_write->pos = MBUF_HEADROOM;
-	sess->mb_write->end = MBUF_HEADROOM;
+	sess->record_layer.mb_write->pos = MBUF_HEADROOM;
+	sess->record_layer.mb_write->end = MBUF_HEADROOM;
 
  out:
 	return err;

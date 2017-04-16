@@ -100,7 +100,8 @@ int tls_handshake_layer_send(struct tls_session *sess,
 		err = encrypt_send_record(sess, TLS_HANDSHAKE, mb);
 	}
 	else {
-		err = tls_record_layer_send(sess, TLS_HANDSHAKE, mb, flush_now);
+		err = tls_record_layer_send(sess, TLS_HANDSHAKE,
+					    mb, flush_now);
 	}
 	if (err)
 		goto out;
@@ -288,8 +289,8 @@ static void destructor(void *data)
 		send_alert(sess, TLS_LEVEL_WARNING, TLS_ALERT_CLOSE_NOTIFY);
 
 	mem_deref(sess->handshake.mb);
-	mem_deref(sess->mb);
-	mem_deref(sess->mb_write);
+	mem_deref(sess->record_layer.mb);
+	mem_deref(sess->record_layer.mb_write);
 	mem_deref(sess->cert_local);
 	mem_deref(sess->cert_remote);
 	mem_deref(sess->cipherv);
@@ -373,14 +374,15 @@ int  tls_session_alloc(struct tls_session **sessp,
 
 	SHA256_Init(&sess->handshake.ctx);
 
-	sess->mb_write = mbuf_alloc(64);
-	if (!sess->mb_write) {
+	// XXX add tls_record_layer_init
+	sess->record_layer.mb_write = mbuf_alloc(64);
+	if (!sess->record_layer.mb_write) {
 		err = ENOMEM;
 		goto out;
 	}
 
-	sess->mb_write->pos = MBUF_HEADROOM;
-	sess->mb_write->end = MBUF_HEADROOM;
+	sess->record_layer.mb_write->pos = MBUF_HEADROOM;
+	sess->record_layer.mb_write->end = MBUF_HEADROOM;
 
 	sess->record_fragment_size = TLS_RECORD_FRAGMENT_SIZE;
 
@@ -1364,57 +1366,58 @@ void tls_session_recvtcp(struct tls_session *sess, struct mbuf *mbx)
 
 	sess->record_bytes_read += mbuf_get_left(mbx);
 
-	if (sess->mb) {
-		pos = sess->mb->pos;
+	if (sess->record_layer.mb) {
+		pos = sess->record_layer.mb->pos;
 
-		sess->mb->pos = sess->mb->end;
+		sess->record_layer.mb->pos = sess->record_layer.mb->end;
 
-		err = mbuf_write_mem(sess->mb,
+		err = mbuf_write_mem(sess->record_layer.mb,
 				     mbuf_buf(mbx),mbuf_get_left(mbx));
 		if (err)
 			goto out;
 
-		sess->mb->pos = pos;
+		sess->record_layer.mb->pos = pos;
 
-		if (mbuf_get_left(sess->mb) > TCP_BUFSIZE_MAX) {
+		if (mbuf_get_left(sess->record_layer.mb) > TCP_BUFSIZE_MAX) {
 			err = EOVERFLOW;
 			goto out;
 		}
 	}
 	else {
-		sess->mb = mbuf_alloc(mbuf_get_left(mbx));
-		if (!sess->mb) {
+		sess->record_layer.mb = mbuf_alloc(mbuf_get_left(mbx));
+		if (!sess->record_layer.mb) {
 			err = ENOMEM;
 			goto out;
 		}
 
-		err = mbuf_write_mem(sess->mb,
+		err = mbuf_write_mem(sess->record_layer.mb,
 				     mbuf_buf(mbx),mbuf_get_left(mbx));
 		if (err)
 			goto out;
 
-		sess->mb->pos = 0;
+		sess->record_layer.mb->pos = 0;
 	}
 
 	mbx = NULL;  /* unused after this */
 
 	for (;;) {
 
-		if (mbuf_get_left(sess->mb) < 5)
+		if (mbuf_get_left(sess->record_layer.mb) < 5)
 			break;
 
-		pos = sess->mb->pos;
+		pos = sess->record_layer.mb->pos;
 
-		err = session_record_decode(sess, sess->mb);
+		err = session_record_decode(sess, sess->record_layer.mb);
 		if (err) {
-			sess->mb->pos = pos;
+			sess->record_layer.mb->pos = pos;
 			if (err == ENODATA)
 				err = 0;
 			break;
 		}
 
-		if (sess->mb->pos >= sess->mb->end) {
-			sess->mb = mem_deref(sess->mb);
+		if (sess->record_layer.mb->pos >= sess->record_layer.mb->end) {
+			sess->record_layer.mb =
+				mem_deref(sess->record_layer.mb);
 			break;
 		}
 		if (sess->closed)
@@ -1513,9 +1516,9 @@ void tls_session_summary(const struct tls_session *sess)
 		  sess->epoch_read, sess->record_seq_read,
 		  sess->record_bytes_read);
 
-	if (sess->mb_write->end) {
+	if (sess->record_layer.mb_write->end) {
 		re_printf("___ pending write: %zu bytes\n",
-			  sess->mb_write->end);
+			  sess->record_layer.mb_write->end);
 	}
 
 	re_printf("selected_cipher_suite:    0x%04x (%s)\n",

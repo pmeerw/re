@@ -115,7 +115,8 @@ static int record_layer_flush(struct tls_session *sess)
 		return EINVAL;
 	}
 
-	sess->record_bytes_write += mbuf_get_left(sess->record_layer.mb_write);
+	sess->record_layer.bytes_write +=
+		mbuf_get_left(sess->record_layer.mb_write);
 
 	if (sess->sendh)
 		err = sess->sendh(sess->record_layer.mb_write, sess->arg);
@@ -146,7 +147,7 @@ void tls_record_layer_new_read_epoch(struct tls_session *sess)
 	++sess->record_layer.epoch_read;
 	sess->record_layer.seq_read = 0;
 
-	sess->next_receive_seq = 0;
+	sess->record_layer.next_receive_seq = 0;
 }
 
 

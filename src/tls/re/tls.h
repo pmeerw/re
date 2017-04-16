@@ -208,7 +208,7 @@ struct tls_session {
 	enum tls_state state;
 
 	/* record layer: */
-	struct {
+	struct tls_record_layer {
 		struct mbuf *mb_write;  /* buffer outgoing records         */
 		struct mbuf *mb;        /* buffer for incoming TCP-packets */
 
@@ -217,12 +217,13 @@ struct tls_session {
 		uint16_t epoch_write;   /* only for DTLS */
 		uint16_t epoch_read;    /* only for DTLS */
 
+		size_t bytes_write;
+		size_t bytes_read;
+
+		uint64_t next_receive_seq;  /* DTLS only */
 	} record_layer;
 
-	size_t record_bytes_write;
-	size_t record_bytes_read;
 	size_t record_fragment_size;
-	uint64_t next_receive_seq;  /* DTLS only */
 
 	struct list exts_remote;
 };

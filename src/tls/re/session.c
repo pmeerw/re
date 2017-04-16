@@ -1214,9 +1214,9 @@ static int handle_record(struct tls_session *sess, struct tls_record *rec)
 	if (tls_version_is_dtls(sess->version)) {
 
 		if (rec->epoch == sess->record_layer.epoch_read &&
-		    rec->seq == sess->next_receive_seq) {
+		    rec->seq == sess->record_layer.next_receive_seq) {
 
-			++sess->next_receive_seq;
+			++sess->record_layer.next_receive_seq;
 		}
 		else {
 			/* SHOULD queue the message but MAY discard it. */
@@ -1364,7 +1364,7 @@ void tls_session_recvtcp(struct tls_session *sess, struct mbuf *mbx)
 	if (!sess || !mbx)
 		return;
 
-	sess->record_bytes_read += mbuf_get_left(mbx);
+	sess->record_layer.bytes_read += mbuf_get_left(mbx);
 
 	if (sess->record_layer.mb) {
 		pos = sess->record_layer.mb->pos;
@@ -1438,7 +1438,7 @@ void tls_session_recvudp(struct tls_session *sess, struct mbuf *mb)
 	if (!sess || !mb)
 		return;
 
-	sess->record_bytes_read += mbuf_get_left(mb);
+	sess->record_layer.bytes_read += mbuf_get_left(mb);
 
 	while (mbuf_get_left(mb) >= 5) {
 
@@ -1511,10 +1511,10 @@ void tls_session_summary(const struct tls_session *sess)
 	re_printf("~~~ Record-layer:  ~~~\n");
 	re_printf("___ write_seq %u.%llu    (%zu bytes)\n",
 		  sess->record_layer.epoch_write, sess->record_layer.seq_write,
-		  sess->record_bytes_write);
+		  sess->record_layer.bytes_write);
 	re_printf("___ read_seq  %u.%llu    (%zu bytes)\n",
 		  sess->record_layer.epoch_read, sess->record_layer.seq_read,
-		  sess->record_bytes_read);
+		  sess->record_layer.bytes_read);
 
 	if (sess->record_layer.mb_write->end) {
 		re_printf("___ pending write: %zu bytes\n",

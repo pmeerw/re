@@ -6,6 +6,8 @@
 
 
 #define TLS_MAX_RSA_BYTES 512  /* 4096 bits */
+#define TLS_MAX_MAC_SIZE   32
+#define TLS_IV_SIZE        16  /* XXX: should be dynamic */
 
 #define DTLS_COOKIE_LENGTH 256
 

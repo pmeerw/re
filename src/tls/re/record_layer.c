@@ -27,8 +27,6 @@
 
 
 #define MBUF_HEADROOM 4
-#define MAX_MAC_SIZE 32
-#define IV_SIZE 16       /* XXX: should be dynamic */
 
 
 static int record_layer_flush(struct tls_session *sess);
@@ -204,7 +202,7 @@ static int record_decrypt_aes_and_unmac(struct tls_session *sess,
 					struct tls_record *rec)
 {
 	const struct key *write_key, *write_MAC_key;
-	uint8_t mac_pkt[MAX_MAC_SIZE], mac_gen[MAX_MAC_SIZE], padding;
+	uint8_t mac_pkt[TLS_MAX_MAC_SIZE], mac_gen[TLS_MAX_MAC_SIZE], padding;
 	size_t start;
 	size_t pos_content;
 	size_t pos_mac;
@@ -216,7 +214,7 @@ static int record_decrypt_aes_and_unmac(struct tls_session *sess,
 	if (!sess || !rec)
 		return EINVAL;
 
-	if (rec->length < (IV_SIZE+20)) {
+	if (rec->length < (TLS_IV_SIZE+20)) {
 		DEBUG_WARNING("record too short\n");
 		return EBADMSG;
 	}
@@ -227,7 +225,7 @@ static int record_decrypt_aes_and_unmac(struct tls_session *sess,
 	mbf.end  = rec->length;
 
 	start       = 0;
-	pos_content = start + IV_SIZE;
+	pos_content = start + TLS_IV_SIZE;
 	mac_sz      = sess->sp_read.mac_length;
 
 	if (sess->conn_end == TLS_CLIENT)
@@ -246,7 +244,7 @@ static int record_decrypt_aes_and_unmac(struct tls_session *sess,
 	}
 
 	pos_mac     = start + rec->length - mac_sz - padding - 1;
-	content_len = rec->length - IV_SIZE - mac_sz - padding - 1;
+	content_len = rec->length - TLS_IV_SIZE - mac_sz - padding - 1;
 
 	mbf.pos = pos_mac;
 	err = mbuf_read_mem(&mbf, mac_pkt, mac_sz);
@@ -285,7 +283,7 @@ static int record_decrypt_aes_and_unmac(struct tls_session *sess,
 
 #if 1
 	/* strip away the leading IV in the front */
-	memmove(rec->fragment, rec->fragment + IV_SIZE, content_len);
+	memmove(rec->fragment, rec->fragment + TLS_IV_SIZE, content_len);
 #else
 	uint8_t *clear;
 

@@ -32,9 +32,8 @@
  */
 
 
-#define MAX_MAC_SIZE 32
 #define TCP_BUFSIZE_MAX (1<<24)
-#define SEED_SIZE 32
+#define TLS_SEED_SIZE 32
 #define MBUF_HEADROOM 4
 
 
@@ -442,7 +441,7 @@ static int encrypt_send_record(struct tls_session *sess,
 			       enum tls_content_type type, struct mbuf *data)
 {
 	struct mbuf *mb_enc = mbuf_alloc(64);
-	uint8_t mac[MAX_MAC_SIZE];
+	uint8_t mac[TLS_MAX_MAC_SIZE];
 	size_t mac_sz = sess->sp_write.mac_length;
 	int err = 0;
 	struct key *write_MAC_key;
@@ -545,7 +544,7 @@ static int encrypt_send_record(struct tls_session *sess,
 static int send_finished(struct tls_session *sess)
 {
 	union handshake hand;
-	uint8_t seed[SEED_SIZE];
+	uint8_t seed[TLS_SEED_SIZE];
 	int err;
 
 	tls_trace(sess, TLS_TRACE_HANDSHAKE, "send Finished\n");
@@ -651,7 +650,7 @@ static int handle_certificate(struct tls_session *sess,
 static int verify_finished(struct tls_session *sess,
 			   const struct finished *fin)
 {
-	uint8_t seed[SEED_SIZE];
+	uint8_t seed[TLS_SEED_SIZE];
 	uint8_t verify_data[TLS_VERIFY_DATA_SIZE];
 	int err;
 
@@ -893,8 +892,6 @@ static void process_handshake(struct tls_session *sess,
 
 	return;
 }
-
-
 
 
 static int handle_handshake_fragment(struct tls_session *sess,

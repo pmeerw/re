@@ -33,7 +33,6 @@
 
 
 #define MAX_MAC_SIZE 32
-#define IV_SIZE 16
 #define TCP_BUFSIZE_MAX (1<<24)
 #define SEED_SIZE 32
 #define MBUF_HEADROOM 4
@@ -896,127 +895,6 @@ static void process_handshake(struct tls_session *sess,
 }
 
 
-/*
- * NOTE: Record layer
- *
- * 1. Decrypt payload using AES
- * 2. Calculate and verify the MAC
- *
- * <pre>
- *      struct {
- *          opaque IV[SecurityParameters.record_iv_length];
- *          block-ciphered struct {
- *              opaque content[TLSCompressed.length];
- *              opaque MAC[SecurityParameters.mac_length];
- *              uint8 padding[GenericBlockCipher.padding_length];
- *              uint8 padding_length;
- *          };
- *      } GenericBlockCipher;
- * <pre>
- *
- */
-static int record_decrypt_aes_and_unmac(struct tls_session *sess,
-					struct tls_record *rec)
-{
-	const struct key *write_key, *write_MAC_key;
-	uint8_t mac_pkt[MAX_MAC_SIZE], mac_gen[MAX_MAC_SIZE], padding;
-	size_t start;
-	size_t pos_content;
-	size_t pos_mac;
-	size_t mac_sz;
-	size_t content_len;
-	int err = 0;
-	struct mbuf mbf;
-
-	if (!sess || !rec)
-		return EINVAL;
-
-	if (rec->length < (IV_SIZE+20)) {
-		DEBUG_WARNING("record too short\n");
-		return EBADMSG;
-	}
-
-	mbf.buf  = rec->fragment;
-	mbf.size = rec->length;
-	mbf.pos  = 0;
-	mbf.end  = rec->length;
-
-	start       = 0;
-	pos_content = start + IV_SIZE;
-	mac_sz      = sess->sp_read.mac_length;
-
-	if (sess->conn_end == TLS_CLIENT)
-		write_key = &sess->key_block.server_write_key;
-	else if (sess->conn_end == TLS_SERVER)
-		write_key = &sess->key_block.client_write_key;
-	else
-		return EINVAL;
-
-	err = tls_crypt_decrypt(write_key, &mbf, rec->length, &padding);
-	assert(mbf.pos <= mbf.size);
-	assert(mbf.end <= mbf.size);
-	if (err) {
-		DEBUG_WARNING("crypt_decrypt error (%m)\n", err);
-		return err;
-	}
-
-	pos_mac     = start + rec->length - mac_sz - padding - 1;
-	content_len = rec->length - IV_SIZE - mac_sz - padding - 1;
-
-	mbf.pos = pos_mac;
-	err = mbuf_read_mem(&mbf, mac_pkt, mac_sz);
-	if (err)
-		return err;
-
-	if (sess->conn_end == TLS_CLIENT)
-		write_MAC_key = &sess->key_block.server_write_MAC_key;
-	else if (sess->conn_end == TLS_SERVER)
-		write_MAC_key = &sess->key_block.client_write_MAC_key;
-	else
-		return EINVAL;
-
-	err = tls_mac_generate(mac_gen, mac_sz, write_MAC_key,
-			       tls_record_get_read_seqnum(sess),
-			       rec->content_type,
-			       rec->proto_ver, content_len,
-			       &mbf.buf[pos_content]);
-	if (err)
-		return err;
-
-	if (0 != secure_compare(mac_gen, mac_pkt, mac_sz)) {
-		DEBUG_WARNING("decrypt: *** MAC Mismatch!"
-			      " (record type '%s', length %u) ***"
-			      "\n",
-			      tls_content_type_name(rec->content_type),
-			      rec->length);
-		re_printf("write_MAC_key:  %w\n",
-			  write_MAC_key->k, write_MAC_key->len);
-		re_printf("read_seq_num:   %llu\n",
-			  tls_record_get_read_seqnum(sess));
-		re_printf("MAC: generated: %w\n", mac_gen, mac_sz);
-		re_printf("     packet:    %w\n", mac_pkt, mac_sz);
-		return EBADMSG;
-	}
-
-#if 1
-	/* strip away the leading IV in the front */
-	memmove(rec->fragment, rec->fragment + IV_SIZE, content_len);
-#else
-	uint8_t *clear;
-
-	clear = mem_zalloc(content_len, NULL);
-
-	mem_cpy(clear, content_len, &rec->fragment[pos_content], content_len);
-
-	mem_deref(rec->fragment);
-	rec->fragment = clear;
-#endif
-
-	/* update record header with length of clear-text record */
-	rec->length = content_len;
-
-	return 0;
-}
 
 
 static int handle_handshake_fragment(struct tls_session *sess,
@@ -1094,7 +972,7 @@ static int handle_handshake_fragment(struct tls_session *sess,
 
 
 /* This is the place for de-multiplexing incoming Records */
-static void handle_cleartext_record(struct tls_session *sess,
+void tls_handle_cleartext_record(struct tls_session *sess,
 				    const struct tls_record *rec)
 {
 	struct mbuf mb_wrap = {rec->fragment, rec->length, 0, rec->length};
@@ -1186,83 +1064,6 @@ static void handle_cleartext_record(struct tls_session *sess,
 }
 
 
-static int print_record_prefix(struct re_printf *pf,
-			       const struct tls_record *rec)
-{
-	int err = 0;
-
-	if (!rec)
-		return 0;
-
-	if (tls_version_is_dtls(rec->proto_ver)) {
-		err = re_hprintf(pf, "seq={%u.%llu} ", rec->epoch, rec->seq);
-	}
-
-	return err;
-}
-
-
-static int handle_record(struct tls_session *sess, struct tls_record *rec)
-{
-	int err = 0;
-
-	tls_trace(sess, TLS_TRACE_RECORD,
-		  "%Hdecode type '%s' fragment_length=%u\n",
-		  print_record_prefix, rec,
-		  tls_content_type_name(rec->content_type), rec->length);
-
-	if (tls_version_is_dtls(sess->version)) {
-
-		if (rec->epoch == sess->record_layer.epoch_read &&
-		    rec->seq == sess->record_layer.next_receive_seq) {
-
-			++sess->record_layer.next_receive_seq;
-		}
-		else {
-			/* SHOULD queue the message but MAY discard it. */
-			DEBUG_INFO("discard message: epoch_seq=%u.%llu\n",
-				   rec->epoch, rec->seq);
-
-			return 0;
-		}
-	}
-
-	switch (sess->sp_read.bulk_cipher_algorithm) {
-
-	case TLS_BULKCIPHER_NULL:
-		rec->length -= sess->sp_read.mac_length;
-		break;
-
-	case TLS_BULKCIPHER_AES:
-		err = record_decrypt_aes_and_unmac(sess, rec);
-		if (err)
-			return err;
-		break;
-
-	default:
-		DEBUG_WARNING("session_record_decode: unknown"
-			      " bulk cipher algo %d\n",
-			      sess->sp_read.bulk_cipher_algorithm);
-		return ENOTSUP;
-	}
-	if (err) {
-		DEBUG_WARNING("session: record decrypt error "
-			      "on type '%s' (%m)\n",
-			      tls_content_type_name(rec->content_type), err);
-		goto out;
-	}
-
-	/* increment sequence number, before passing on to upper layer */
-	++sess->record_layer.seq_read;
-
-	/* Pass the Record on to upper layers */
-	handle_cleartext_record(sess, rec);
-
- out:
-	return err;
-}
-
-
 static int session_record_decode(struct tls_session *sess, struct mbuf *mb)
 {
 	struct tls_record *rec = NULL;
@@ -1272,7 +1073,7 @@ static int session_record_decode(struct tls_session *sess, struct mbuf *mb)
 	if (err)
 		return err;
 
-	err = handle_record(sess, rec);
+	err = tls_record_layer_handle_record(sess, rec);
 	if (err)
 		goto out;
 

@@ -234,6 +234,8 @@ bool tls_cipher_suite_lookup(const struct tls_session *sess,
 void tls_session_set_state(struct tls_session *sess, enum tls_state state);
 const char *tls_state_name(enum tls_state st);
 int tls_send_certificate(struct tls_session *sess);
+void tls_handle_cleartext_record(struct tls_session *sess,
+				 const struct tls_record *rec);
 
 int tls_client_send_clienthello(struct tls_session *sess);
 int tls_client_handle_server_hello(struct tls_session *sess,
@@ -261,6 +263,8 @@ void tls_record_layer_new_write_epoch(struct tls_session *sess);
 void tls_record_layer_new_read_epoch(struct tls_session *sess);
 uint64_t tls_record_get_read_seqnum(const struct tls_session *sess);
 uint64_t tls_record_get_write_seqnum(const struct tls_session *sess);
+int tls_record_layer_handle_record(struct tls_session *sess,
+				   struct tls_record *rec);
 
 
 /*
@@ -268,3 +272,7 @@ uint64_t tls_record_get_write_seqnum(const struct tls_session *sess);
  */
 
 bool tls_version_isvalid(enum tls_version ver);
+
+
+int tls_record_print_prefix(struct re_printf *pf,
+			    const struct tls_record *rec);

@@ -183,3 +183,19 @@ void tls_record_dump(const struct tls_record *rec)
 	re_printf("\n");
 	re_printf("\x1b[;m");
 }
+
+
+int tls_record_print_prefix(struct re_printf *pf,
+			    const struct tls_record *rec)
+{
+	int err = 0;
+
+	if (!rec)
+		return 0;
+
+	if (tls_version_is_dtls(rec->proto_ver)) {
+		err = re_hprintf(pf, "seq={%u.%llu} ", rec->epoch, rec->seq);
+	}
+
+	return err;
+}

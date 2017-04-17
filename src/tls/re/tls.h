@@ -271,8 +271,7 @@ int tls_record_layer_write(struct tls_session *sess,
 int tls_record_layer_send(struct tls_session *sess,
 			  enum tls_content_type type,
 			  struct mbuf *mb_data, bool flush_now);
-void tls_record_layer_new_write_epoch(struct tls_session *sess);
-void tls_record_layer_new_read_epoch(struct tls_session *sess);
+void tls_record_layer_new_epoch(struct tls_session *sess, int rw);
 uint64_t tls_record_get_read_seqnum(const struct tls_session *sess);
 uint64_t tls_record_get_write_seqnum(const struct tls_session *sess);
 int tls_record_layer_handle_record(struct tls_session *sess,

@@ -424,7 +424,7 @@ static int send_change_cipher_spec(struct tls_session *sess)
 	if (err)
 		goto out;
 
-	tls_record_layer_new_write_epoch(sess);
+	tls_record_layer_new_epoch(sess, WRITE);
 
 	err = tls_secparam_set(&sess->sp_write, sess->suite);
 	if (err) {
@@ -1103,7 +1103,7 @@ static int handle_change_cipher_spec(struct tls_session *sess)
 	}
 
 	/* new epoch, reset sequence number */
-	tls_record_layer_new_read_epoch(sess);
+	tls_record_layer_new_epoch(sess, READ);
 
 	if (sess->conn_end == TLS_SERVER) {
 

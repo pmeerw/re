@@ -133,21 +133,20 @@ static int record_layer_flush(struct tls_session *sess)
 }
 
 
-void tls_record_layer_new_write_epoch(struct tls_session *sess)
+void tls_record_layer_new_epoch(struct tls_session *sess, int rw)
 {
-	/* new epoch, reset sequence number */
-	++sess->record_layer.write.epoch;
-	sess->record_layer.write.seq = 0;
-}
+	if (rw == READ) {
+		/* new epoch, reset sequence number */
+		++sess->record_layer.read.epoch;
+		sess->record_layer.read.seq = 0;
 
-
-void tls_record_layer_new_read_epoch(struct tls_session *sess)
-{
-	/* new epoch, reset sequence number */
-	++sess->record_layer.read.epoch;
-	sess->record_layer.read.seq = 0;
-
-	sess->record_layer.next_receive_seq = 0;
+		sess->record_layer.next_receive_seq = 0;
+	}
+	else {
+		/* new epoch, reset sequence number */
+		++sess->record_layer.write.epoch;
+		sess->record_layer.write.seq = 0;
+	}
 }
 
 

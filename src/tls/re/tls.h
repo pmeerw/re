@@ -17,6 +17,12 @@
 #define NO_FLUSH (false)
 
 
+enum rw {
+	READ  = 0,
+	WRITE = 1,
+};
+
+
 /*
   State Machine:
 
@@ -219,10 +225,13 @@ struct tls_session {
 		struct mbuf *mb_write;  /* buffer outgoing records         */
 		struct mbuf *mb;        /* buffer for incoming TCP-packets */
 
-		uint64_t seq_write;     /* sequence number for each record */
-		uint64_t seq_read;      /* sequence number for each record */
-		uint16_t epoch_write;   /* only for DTLS */
-		uint16_t epoch_read;    /* only for DTLS */
+		struct {
+			uint64_t seq;     /* sequence number for each record */
+
+			uint16_t epoch;   /* only for DTLS */
+
+		} write, read;
+
 
 		size_t bytes_write;
 		size_t bytes_read;

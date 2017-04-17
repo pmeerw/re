@@ -1306,12 +1306,15 @@ void tls_session_summary(const struct tls_session *sess)
 		  sess->handshake.seq_read, sess->handshake.bytes_read);
 	re_printf("\n");
 
+	// XXX: add tls_record_layer_summary
 	re_printf("~~~ Record-layer:  ~~~\n");
 	re_printf("___ write_seq %u.%llu    (%zu bytes)\n",
-		  sess->record_layer.epoch_write, sess->record_layer.seq_write,
+		  sess->record_layer.write.epoch,
+		  sess->record_layer.write.seq,
 		  sess->record_layer.bytes_write);
 	re_printf("___ read_seq  %u.%llu    (%zu bytes)\n",
-		  sess->record_layer.epoch_read, sess->record_layer.seq_read,
+		  sess->record_layer.read.epoch,
+		  sess->record_layer.read.seq,
 		  sess->record_layer.bytes_read);
 
 	if (sess->record_layer.mb_write->end) {

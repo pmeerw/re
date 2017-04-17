@@ -441,18 +441,23 @@ static int encrypt_send_record(struct tls_session *sess,
 			       enum tls_content_type type, struct mbuf *data)
 {
 	struct mbuf *mb_enc = mbuf_alloc(64);
+	struct key *write_MAC_key;
+	struct key *write_key;
 	uint8_t mac[TLS_MAX_MAC_SIZE];
 	size_t mac_sz = sess->sp_write.mac_length;
 	int err = 0;
-	struct key *write_MAC_key;
-	struct key *write_key;
 
-	if (sess->conn_end == TLS_CLIENT)
+	if (sess->conn_end == TLS_CLIENT) {
 		write_MAC_key = &sess->key_block.client_write_MAC_key;
-	else if (sess->conn_end == TLS_SERVER)
+		write_key     = &sess->key_block.client_write_key;
+	}
+	else if (sess->conn_end == TLS_SERVER) {
 		write_MAC_key = &sess->key_block.server_write_MAC_key;
-	else
+		write_key     = &sess->key_block.server_write_key;
+	}
+	else {
 		return EINVAL;
+	}
 
 	switch (sess->sp_write.mac_algorithm) {
 
@@ -490,13 +495,6 @@ static int encrypt_send_record(struct tls_session *sess,
 		if (err)
 			goto out;
 	}
-
-	if (sess->conn_end == TLS_CLIENT)
-		write_key = &sess->key_block.client_write_key;
-	else if (sess->conn_end == TLS_SERVER)
-		write_key = &sess->key_block.server_write_key;
-	else
-		return EINVAL;
 
 	switch (sess->sp_write.bulk_cipher_algorithm) {
 

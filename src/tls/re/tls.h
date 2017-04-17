@@ -240,43 +240,43 @@ struct tls_session {
 	struct list exts_remote;
 };
 
-const struct list *tls_session_remote_exts(const struct tls_session *sess);
 bool tls_cipher_suite_lookup(const struct tls_session *sess,
 			     enum tls_cipher_suite cs);
 void tls_session_set_state(struct tls_session *sess, enum tls_state state);
-const char *tls_state_name(enum tls_state st);
-int tls_send_certificate(struct tls_session *sess);
+int  tls_send_certificate(struct tls_session *sess);
 void tls_handle_cleartext_record(struct tls_session *sess,
 				 const struct tls_record *rec);
+const struct list *tls_session_remote_exts(const struct tls_session *sess);
+const char *tls_state_name(enum tls_state st);
 
-int tls_client_send_clienthello(struct tls_session *sess);
-int tls_client_handle_server_hello(struct tls_session *sess,
-				   const struct serverhello *hell);
-int tls_client_send_clientkeyexchange(struct tls_session *sess);
+int  tls_client_send_clienthello(struct tls_session *sess);
+int  tls_client_handle_server_hello(struct tls_session *sess,
+				    const struct serverhello *hell);
+int  tls_client_send_clientkeyexchange(struct tls_session *sess);
 
-int tls_server_handle_client_hello(struct tls_session *sess,
-				   const struct clienthello *chell);
-int tls_server_handle_clientkeyexchange(struct tls_session *sess,
-					const struct client_key_exchange *cke);
+int  tls_server_handle_client_hello(struct tls_session *sess,
+				    const struct clienthello *chell);
+int  tls_server_handle_clientkeyexchange(struct tls_session *sess,
+				 const struct client_key_exchange *cke);
 
-int tls_handshake_layer_send(struct tls_session *sess,
-			     enum tls_handshake_type msg_type,
-			     const union handshake *hand,
-			     bool flush_now, bool crypt);
+int  tls_handshake_layer_send(struct tls_session *sess,
+			      enum tls_handshake_type msg_type,
+			      const union handshake *hand,
+			      bool flush_now, bool crypt);
 
-int tls_record_layer_write(struct tls_session *sess,
+int  tls_record_layer_write(struct tls_session *sess,
+			    enum tls_content_type type,
+			    const uint8_t *frag, size_t fraglen,
+			    bool flush_now);
+int  tls_record_layer_send(struct tls_session *sess,
 			   enum tls_content_type type,
-			   const uint8_t *frag, size_t fraglen,
-			   bool flush_now);
-int tls_record_layer_send(struct tls_session *sess,
-			  enum tls_content_type type,
-			  struct mbuf *mb_data, bool flush_now);
+			   struct mbuf *mb_data, bool flush_now);
 void tls_record_layer_new_epoch(struct tls_record_layer *record_layer, int rw);
+int  tls_record_layer_handle_record(struct tls_session *sess,
+				    struct tls_record *rec);
+void tls_record_layer_summary(const struct tls_record_layer *record_layer);
 uint64_t tls_record_get_read_seqnum(const struct tls_session *sess);
 uint64_t tls_record_get_write_seqnum(const struct tls_session *sess);
-int tls_record_layer_handle_record(struct tls_session *sess,
-				   struct tls_record *rec);
-void tls_record_layer_summary(const struct tls_record_layer *record_layer);
 
 
 /*

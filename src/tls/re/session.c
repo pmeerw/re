@@ -70,9 +70,9 @@ void tls_session_set_state(struct tls_session *sess, enum tls_state state)
 
 
 int tls_handshake_layer_send(struct tls_session *sess,
-				enum tls_handshake_type msg_type,
-				const union handshake *hand,
-				bool flush_now, bool crypt)
+			     enum tls_handshake_type msg_type,
+			     const union handshake *hand,
+			     bool flush_now, bool crypt)
 {
 	struct mbuf *mb = NULL;
 	int err;
@@ -259,7 +259,7 @@ int tls_send_certificate(struct tls_session *sess)
 	cert->count = 1;
 
 	err = tls_handshake_layer_send(sess, TLS_CERTIFICATE, &hand,
-				   false, false);
+				       NO_FLUSH, false);
 	if (err)
 		goto out;
 
@@ -575,7 +575,7 @@ static int send_finished(struct tls_session *sess)
 	}
 
 	err = tls_handshake_layer_send(sess, TLS_FINISHED, &hand,
-				   true, true);
+				       FLUSH, true);
 	if (err) {
 		DEBUG_WARNING("finished: handshake_layer_send failed %m\n",
 			      err);

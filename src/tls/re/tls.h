@@ -5,11 +5,16 @@
  */
 
 
+/* constants */
+
 #define TLS_MAX_RSA_BYTES 512  /* 4096 bits */
 #define TLS_MAX_MAC_SIZE   32
 #define TLS_IV_SIZE        16  /* XXX: should be dynamic */
 
 #define DTLS_COOKIE_LENGTH 256
+
+#define FLUSH    (true)
+#define NO_FLUSH (false)
 
 
 /*
@@ -250,8 +255,8 @@ int tls_server_handle_clientkeyexchange(struct tls_session *sess,
 					const struct client_key_exchange *cke);
 
 int tls_handshake_layer_send(struct tls_session *sess,
-				enum tls_handshake_type msg_type,
-				const union handshake *hand,
+			     enum tls_handshake_type msg_type,
+			     const union handshake *hand,
 			     bool flush_now, bool crypt);
 
 int tls_record_layer_write(struct tls_session *sess,

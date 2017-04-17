@@ -58,7 +58,7 @@ static int send_serverhello(struct tls_session *sess)
 	}
 
 	err = tls_handshake_layer_send(sess, TLS_SERVER_HELLO, &hand,
-				   false, false);
+				       NO_FLUSH, false);
 	if (err)
 		goto out;
 
@@ -74,7 +74,7 @@ static int send_serverhellodone(struct tls_session *sess)
 	int err;
 
 	err = tls_handshake_layer_send(sess, TLS_SERVER_HELLO_DONE, NULL,
-				   true, false);
+				       FLUSH, false);
 	if (err)
 		return err;
 

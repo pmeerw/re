@@ -79,7 +79,7 @@ int tls_client_send_clienthello(struct tls_session *sess)
 	}
 
 	err = tls_handshake_layer_send(sess, TLS_CLIENT_HELLO, &hand,
-				   true, false);
+				       FLUSH, false);
 	if (err)
 		goto out;
 
@@ -170,7 +170,7 @@ int tls_client_send_clientkeyexchange(struct tls_session *sess)
 		goto out;
 
 	err = tls_handshake_layer_send(sess, TLS_CLIENT_KEY_EXCHANGE,
-				   &hand.u, false, false);
+				       &hand.u, NO_FLUSH, false);
 	if (err)
 		goto out;
 

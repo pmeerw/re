@@ -1162,7 +1162,7 @@ void tls_session_recvtcp(struct tls_session *sess, struct mbuf *mbx)
 	if (!sess || !mbx)
 		return;
 
-	sess->record_layer.bytes_read += mbuf_get_left(mbx);
+	sess->record_layer.read.bytes += mbuf_get_left(mbx);
 
 	if (sess->record_layer.mb) {
 		pos = sess->record_layer.mb->pos;
@@ -1236,7 +1236,7 @@ void tls_session_recvudp(struct tls_session *sess, struct mbuf *mb)
 	if (!sess || !mb)
 		return;
 
-	sess->record_layer.bytes_read += mbuf_get_left(mb);
+	sess->record_layer.read.bytes += mbuf_get_left(mb);
 
 	while (mbuf_get_left(mb) >= 5) {
 
@@ -1311,11 +1311,11 @@ void tls_session_summary(const struct tls_session *sess)
 	re_printf("___ write_seq %u.%llu    (%zu bytes)\n",
 		  sess->record_layer.write.epoch,
 		  sess->record_layer.write.seq,
-		  sess->record_layer.bytes_write);
+		  sess->record_layer.write.bytes);
 	re_printf("___ read_seq  %u.%llu    (%zu bytes)\n",
 		  sess->record_layer.read.epoch,
 		  sess->record_layer.read.seq,
-		  sess->record_layer.bytes_read);
+		  sess->record_layer.read.bytes);
 
 	if (sess->record_layer.mb_write->end) {
 		re_printf("___ pending write: %zu bytes\n",

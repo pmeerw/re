@@ -227,14 +227,10 @@ struct tls_session {
 
 		struct {
 			uint64_t seq;     /* sequence number for each record */
-
 			uint16_t epoch;   /* only for DTLS */
+			size_t bytes;
 
 		} write, read;
-
-
-		size_t bytes_write;
-		size_t bytes_read;
 
 		uint64_t next_receive_seq;  /* DTLS only */
 	} record_layer;

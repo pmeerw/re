@@ -115,7 +115,7 @@ static int record_layer_flush(struct tls_session *sess)
 		return EINVAL;
 	}
 
-	sess->record_layer.bytes_write +=
+	sess->record_layer.write.bytes +=
 		mbuf_get_left(sess->record_layer.mb_write);
 
 	if (sess->sendh)

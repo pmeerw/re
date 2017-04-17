@@ -424,7 +424,7 @@ static int send_change_cipher_spec(struct tls_session *sess)
 	if (err)
 		goto out;
 
-	tls_record_layer_new_epoch(sess, WRITE);
+	tls_record_layer_new_epoch(&sess->record_layer, WRITE);
 
 	err = tls_secparam_set(&sess->sp_write, sess->suite);
 	if (err) {
@@ -1103,7 +1103,7 @@ static int handle_change_cipher_spec(struct tls_session *sess)
 	}
 
 	/* new epoch, reset sequence number */
-	tls_record_layer_new_epoch(sess, READ);
+	tls_record_layer_new_epoch(&sess->record_layer, READ);
 
 	if (sess->conn_end == TLS_SERVER) {
 
@@ -1306,21 +1306,7 @@ void tls_session_summary(const struct tls_session *sess)
 		  sess->handshake.seq_read, sess->handshake.bytes_read);
 	re_printf("\n");
 
-	// XXX: add tls_record_layer_summary
-	re_printf("~~~ Record-layer:  ~~~\n");
-	re_printf("___ write_seq %u.%llu    (%zu bytes)\n",
-		  sess->record_layer.write.epoch,
-		  sess->record_layer.write.seq,
-		  sess->record_layer.write.bytes);
-	re_printf("___ read_seq  %u.%llu    (%zu bytes)\n",
-		  sess->record_layer.read.epoch,
-		  sess->record_layer.read.seq,
-		  sess->record_layer.read.bytes);
-
-	if (sess->record_layer.mb_write->end) {
-		re_printf("___ pending write: %zu bytes\n",
-			  sess->record_layer.mb_write->end);
-	}
+	tls_record_layer_summary(&sess->record_layer);
 
 	re_printf("selected_cipher_suite:    0x%04x (%s)\n",
 		  sess->selected_cipher_suite,

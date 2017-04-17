@@ -133,19 +133,22 @@ static int record_layer_flush(struct tls_session *sess)
 }
 
 
-void tls_record_layer_new_epoch(struct tls_session *sess, int rw)
+void tls_record_layer_new_epoch(struct tls_record_layer *record_layer, int rw)
 {
+	if (!record_layer)
+		return;
+
 	if (rw == READ) {
 		/* new epoch, reset sequence number */
-		++sess->record_layer.read.epoch;
-		sess->record_layer.read.seq = 0;
+		++record_layer->read.epoch;
+		record_layer->read.seq = 0;
 
-		sess->record_layer.next_receive_seq = 0;
+		record_layer->next_receive_seq = 0;
 	}
 	else {
 		/* new epoch, reset sequence number */
-		++sess->record_layer.write.epoch;
-		sess->record_layer.write.seq = 0;
+		++record_layer->write.epoch;
+		record_layer->write.seq = 0;
 	}
 }
 
@@ -360,4 +363,26 @@ int tls_record_layer_handle_record(struct tls_session *sess,
 
  out:
 	return err;
+}
+
+
+void tls_record_layer_summary(const struct tls_record_layer *record_layer)
+{
+	if (!record_layer)
+		return;
+
+	re_printf("~~~ Record-layer:  ~~~\n");
+	re_printf("___ write_seq %u.%llu    (%zu bytes)\n",
+		  record_layer->write.epoch,
+		  record_layer->write.seq,
+		  record_layer->write.bytes);
+	re_printf("___ read_seq  %u.%llu    (%zu bytes)\n",
+		  record_layer->read.epoch,
+		  record_layer->read.seq,
+		  record_layer->read.bytes);
+
+	if (record_layer->mb_write->end) {
+		re_printf("___ pending write: %zu bytes\n",
+			  record_layer->mb_write->end);
+	}
 }

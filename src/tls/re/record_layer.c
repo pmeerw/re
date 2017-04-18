@@ -108,6 +108,9 @@ static int record_layer_flush(struct tls_session *sess)
 {
 	int err;
 
+	if (!sess->sendh)
+		return EIO;
+
 	sess->record_layer.mb_write->pos = MBUF_HEADROOM;
 
 	if (!mbuf_get_left(sess->record_layer.mb_write)) {
@@ -118,10 +121,7 @@ static int record_layer_flush(struct tls_session *sess)
 	sess->record_layer.write.bytes +=
 		mbuf_get_left(sess->record_layer.mb_write);
 
-	if (sess->sendh)
-		err = sess->sendh(sess->record_layer.mb_write, sess->arg);
-	else
-		err = EIO;
+	err = sess->sendh(sess->record_layer.mb_write, sess->arg);
 	if (err)
 		goto out;
 
@@ -359,7 +359,9 @@ int tls_record_layer_handle_record(struct tls_session *sess,
 	++sess->record_layer.read.seq;
 
 	/* Pass the Record on to upper layers */
-	tls_handle_cleartext_record(sess, rec);
+	err = tls_handle_cleartext_record(sess, rec);
+	if (err)
+		return err;
 
  out:
 	return err;

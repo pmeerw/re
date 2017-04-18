@@ -214,8 +214,10 @@ static int send_alert(struct tls_session *sess,
 static void conn_close(struct tls_session *sess, int err)
 {
 	enum tls_alertdescr descr = TLS_ALERT_INTERNAL_ERROR;
+	tls_sess_close_h *closeh = sess->closeh;
 
 	sess->closed = true;
+	sess->closeh = NULL;
 
 	if (err == 0)
 		descr = TLS_ALERT_CLOSE_NOTIFY;
@@ -226,9 +228,8 @@ static void conn_close(struct tls_session *sess, int err)
 	send_alert(sess, TLS_LEVEL_FATAL, descr);
 
 	/* call close-handler */
-	if (sess->closeh) {
-		sess->closeh(err, sess->arg);
-		sess->closeh = NULL;
+	if (closeh) {
+		closeh(err, sess->arg);
 	}
 }
 
@@ -729,6 +730,7 @@ static int client_handle_server_hello_done(struct tls_session *sess)
 static int handle_finished(struct tls_session *sess,
 			   const struct finished *fin)
 {
+	uint32_t nrefs;
 	int err;
 
 	if (!sess->got_ccs) {
@@ -765,8 +767,18 @@ static int handle_finished(struct tls_session *sess,
 	}
 
 	sess->estab = true;
+
+	mem_ref(sess);
+
 	if (sess->estabh)
 		sess->estabh(sess->arg);
+
+	nrefs = mem_nrefs(sess);
+	mem_deref(sess);
+
+	/* check if connection was deref'ed from handler */
+	if (nrefs == 1)
+		return ECONNRESET;
 
  out:
 	return err;
@@ -945,7 +957,6 @@ static int handle_handshake_fragment(struct tls_session *sess,
 
 		length = sess->handshake.mb->pos - pos;
 
-		mem_ref(sess);
 		process_handshake(sess, frag, length, handshake);
 
 		mem_deref(handshake);
@@ -957,7 +968,7 @@ static int handle_handshake_fragment(struct tls_session *sess,
 		}
 		if (sess->closed)
 			stop = true;
-		mem_deref(sess);
+
 		if (stop)
 			break;
 	}
@@ -967,7 +978,7 @@ static int handle_handshake_fragment(struct tls_session *sess,
 
 
 /* This is the place for de-multiplexing incoming Records */
-void tls_handle_cleartext_record(struct tls_session *sess,
+int tls_handle_cleartext_record(struct tls_session *sess,
 				    const struct tls_record *rec)
 {
 	struct mbuf mb_wrap = {rec->fragment, rec->length, 0, rec->length};
@@ -975,7 +986,7 @@ void tls_handle_cleartext_record(struct tls_session *sess,
 	int err = 0;
 
 	if (sess->closed)
-		return;
+		return ECONNRESET;
 
 	switch (rec->content_type) {
 
@@ -1007,8 +1018,14 @@ void tls_handle_cleartext_record(struct tls_session *sess,
 		if (err)
 			goto out;
 
-		DEBUG_WARNING("received alert: %s\n",
-			      tls_alert_name(alert.descr));
+		if (alert.descr == TLS_ALERT_CLOSE_NOTIFY) {
+			DEBUG_NOTICE("received alert: %s\n",
+				     tls_alert_name(alert.descr));
+		}
+		else {
+			DEBUG_WARNING("received alert: %s\n",
+				      tls_alert_name(alert.descr));
+		}
 
 		tls_trace(sess, TLS_TRACE_ALERT, "recv alert: %s\n",
 			   tls_alert_name(alert.descr));
@@ -1056,6 +1073,8 @@ void tls_handle_cleartext_record(struct tls_session *sess,
 
 		conn_close(sess, err);
 	}
+
+	return err;
 }
 
 

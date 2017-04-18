@@ -244,7 +244,7 @@ bool tls_cipher_suite_lookup(const struct tls_session *sess,
 			     enum tls_cipher_suite cs);
 void tls_session_set_state(struct tls_session *sess, enum tls_state state);
 int  tls_send_certificate(struct tls_session *sess);
-void tls_handle_cleartext_record(struct tls_session *sess,
+int  tls_handle_cleartext_record(struct tls_session *sess,
 				 const struct tls_record *rec);
 const struct list *tls_session_remote_exts(const struct tls_session *sess);
 const char *tls_state_name(enum tls_state st);
